@@ -1,12 +1,14 @@
-# RumoCerto MZ — Versão 2.3 gratuita — planos profissionais e PDF optimizado
+# RumoCerto MZ — Versão 2.4 — orientação profissional gratuita
 
 **Grupo 8 · Programação Web II · ISUTC · 2026**
 
 Aplicação Vue 3 para jovens moçambicanos: indicadores reais de desemprego juvenil, criação de planos educativos personalizados de 30 dias em PDF e, **após configurar os serviços gratuitos**, dois e-mails: confirmação imediata e entrega agendada cerca de cinco minutos depois.
 
-**Versão v2.3:** actualização académica preparada em 13/11/2026. A versão v2.1 já tinha sido testada no site público e recebia os dois e-mails. Os novos ficheiros v2.3 têm **26 testes automatizados aprovados localmente**, mas ainda necessitam do deploy de produção e de um teste real de e-mail e Gemini. O código não deve ser apresentado ao docente como publicado antes dessas verificações.
+**Estado verificado em 15/11/2026:** frontend v2.3 publicado no GitHub Pages, Worker público activo, dois e-mails recebidos e um plano PDF gerado com Gemini. A v2.4 é uma revisão incremental de qualidade, a validar em pull request antes de publicar; ainda não se deve apresentá-la como versão pública.
 
-**Site público actual (versão anterior até fazeres o deploy):** https://k6n9.github.io/rumocerto-mz/  ·  **API:** https://rumocerto-mz-api.k3n4.workers.dev/api/saude
+**Site publicado:** https://k6n9.github.io/rumocerto-mz/  ·  **API:** https://rumocerto-mz-api.k3n4.workers.dev/api/saude
+
+**Retoques v2.4:** títulos de semanas sem repetições, tempo sugerido por semana, melhor quebra de página do PDF, prévia com instruções correctas, estados legíveis, formulário melhor em telemóveis e dados do PDF fixados no momento do pedido. Ver [docs/RETOQUES_FINAIS_V2_4.md](docs/RETOQUES_FINAIS_V2_4.md).
 
 **Novidades v2.3:**
 - Gerador PDF com melhor paginação, quatro semanas, tarefas com estimativas de tempo, logótipo e rodapé informativo.
@@ -61,7 +63,7 @@ Sem backend configurado: seleccionar área, situação e objectivo, clicar **Pr�
 ### Testes automatizados
 
 ```bash
-npm test     # 26 testes automatizados (frontend e backend, sem consumir APIs reais)
+npm test     # 28 testes automatizados (frontend e backend, sem consumir APIs reais)
 npm run build
 npm run preview
 ```
@@ -120,11 +122,11 @@ public/branding/                   # identidade visual já integrada
 docs/INSTALAR_V2_FREE.md           # passos para Mac e deploy
 ```
 
-## Links finais — preencher antes de entregar
+## Links públicos (verificar antes da entrega)
 
-- Repositório: `PREENCHER_URL_GITHUB`
-- Site: `PREENCHER_URL_GITHUB_PAGES`
-- API Worker: `PREENCHER_URL_WORKER`
+- Repositório: https://github.com/K6N9/rumocerto-mz
+- Site: https://k6n9.github.io/rumocerto-mz/
+- API Worker: https://rumocerto-mz-api.k3n4.workers.dev/api/saude
 
 ## Transparência do apoio de IA
 
