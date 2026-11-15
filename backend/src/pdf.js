@@ -5,60 +5,136 @@ function ansi(s) {
 }
 function safeText(s) { return ansi(s).replaceAll('\\','\\\\').replaceAll('(','\\(').replaceAll(')','\\)') }
 function bytes(s) { return Uint8Array.from([...s].map(c=>c.charCodeAt(0)&255)) }
-function quebrar(t,max=91) { const out=[];let linha='';for(const word of ansi(t).split(/\s+/)){if(!word)continue;if((linha+' '+word).trim().length>max){if(linha)out.push(linha);linha=word;}else linha=(linha+' '+word).trim()}if(linha)out.push(linha);return out.length?out:[''] }
+/**
+ * Paginação com rodapé informativo fixo: evita páginas criadas apenas
+ * pelo método de elaboração e pela fonte dos dados nacionais.
+ * Preserva a geração 100% gratuita no Cloudflare Worker.
+ */
 export function criarPDF(request, plano, options={}) {
   const date = options.date || new Date()
-  const paginas=[];let cmds=[];let y=695;let pageNum=0
-  function traco(x1,y1,x2,y2) {cmds.push('0.82 0.90 0.90 RG 1 w '+x1+' '+y1+' m '+x2+' '+y2+' l S')}
+  const paginas = []
+  let cmds = []
+  let y = 687
+  let pageNum = 0
+  const LIMITE_CONTEUDO = 96
+  const ESQUERDA = 49
+  const DIREITA = 547
+  const textoFonte = 'Fonte dos indicadores: data.worldbank.org/indicator/SL.UEM.1524.ZS?locations=MZ'
+
   function texto(s,x,yy,size=10,bold=false,color='0.12 0.20 0.29') {
     cmds.push(color+' rg BT /'+(bold?'FB':'F')+' '+size+' Tf 1 0 0 1 '+x+' '+yy+' Tm ('+safeText(s)+') Tj ET')
   }
+  function rect(x,yy,w,h,cor) { cmds.push(cor+' rg '+x+' '+yy+' '+w+' '+h+' re f') }
+  function traco(x1,yy,x2,yy2) {cmds.push('0.80 0.90 0.90 RG 0.7 w '+x1+' '+yy+' m '+x2+' '+yy2+' l S')}
+
+  // Estimativa conservadora da largura das letras em Helvetica (pontos).
+  // Também quebra palavras muito longas para não saírem da página.
+  function largura(s,size,bold=false) {
+    let u=0
+    for(const c of s) {
+      if(c===' ') u+=0.28
+      else if('.,:;!|ilItfj'.includes(c)) u+=0.29
+      else if('MW@%#'.includes(c)) u+=0.86
+      else if(/[A-ZÁÉÍÓÚÀÂÊÔÃÕÇ]/.test(c)) u+=0.66
+      else u+=0.53
+    }
+    return u*size*(bold?1.07:1)
+  }
+  function quebrarLargura(s,maxWidth,size=10,bold=false) {
+    const words=ansi(s).replace(/\s+/g,' ').trim().split(' ').filter(Boolean)
+    const lines=[]; let line=''
+    for(let word of words) {
+      const candidate=line?line+' '+word:word
+      if(largura(candidate,size,bold)<=maxWidth) {line=candidate;continue}
+      if(line){lines.push(line);line=''}
+      while(word && largura(word,size,bold)>maxWidth) {
+        let part=''
+        while(word && largura(part+word[0],size,bold)<=maxWidth) {part+=word[0];word=word.slice(1)}
+        if(!part){part=word[0];word=word.slice(1)}
+        lines.push(part)
+      }
+      line=word
+    }
+    if(line)lines.push(line)
+    return lines.length?lines:['']
+  }
   function iniciar() {
     if(cmds.length) paginas.push(cmds.join('\n'))
-    cmds=[];pageNum++;y=695
-    cmds.push('0.055 0.18 0.27 rg 0 751 595 91 re f')
-    cmds.push('0.06 0.65 0.53 rg 0 744 595 7 re f')
+    cmds=[]; pageNum++; y=687
+    rect(0,751,595,91,'0.055 0.18 0.27')
+    rect(0,744,595,7,'0.06 0.65 0.53')
     texto('RumoCerto MZ',48,793,24,true,'1 1 1')
     texto('Plano de desenvolvimento profissional | Grupo 8 - ISUTC',48,770,10,false,'0.75 0.95 0.89')
-    texto('Plano educativo - 30 dias',48,724,9,true,'0.06 0.57 0.47')
+    texto('PLANO EDUCATIVO  |  30 DIAS  |  GRATUITO',48,719,9,true,'0.06 0.57 0.47')
     cmds.push('q 63 0 0 63 486 765 cm /ImLogo Do Q')
-    cmds.push('0.89 0.94 0.95 rg 0 0 595 42 re f')
-    texto('RumoCerto MZ | Formação e orientação - sem promessa de emprego',45,24,8)
-    texto('Página '+pageNum,520,24,8)
+
+    // Nota metodológica e fonte permanecem sempre no rodapé e nunca
+    // iniciam uma página adicional. Informação clara para o docente.
+    rect(0,0,595,80,'0.89 0.94 0.95')
+    traco(0,80,595,80)
+    texto('Elaboração: '+(plano.metodo||'Orientação educativa'),ESQUERDA,61,8,false,'0.12 0.31 0.39')
+    texto(textoFonte,ESQUERDA,47,7.6,false,'0.12 0.31 0.39')
+    texto('RumoCerto MZ | Orientação - sem promessa de emprego',ESQUERDA,23,8)
+    texto('Página '+pageNum,520,23,8)
   }
-  function linha(s, opts={}) {
-    const max = opts.max || 91; const sz=opts.size || 10
-    for(const t of quebrar(s, max)) {
-      if(y<85) iniciar()
-      texto(t,49+(opts.indent||0),y,sz,Boolean(opts.bold),opts.color || '0.12 0.20 0.29')
-      y-=opts.lineHeight||15
+  function garantir(necessario) { if(y-necessario<LIMITE_CONTEUDO)iniciar() }
+  function linha(s,opts={}) {
+    const sz=opts.size||10
+    const lh=opts.lineHeight||14
+    const indent=opts.indent||0
+    const parts=quebrarLargura(s,DIREITA-(ESQUERDA+indent),sz,Boolean(opts.bold))
+    for(const part of parts) {
+      garantir(lh)
+      texto(part,ESQUERDA+indent,y,sz,Boolean(opts.bold),opts.color||'0.12 0.20 0.29')
+      y-=lh
     }
-    if(opts.after)y-=opts.after
+    y-=opts.after||0
   }
-  function titulo(s) {if(y<130)iniciar();y-=7;linha(s,{size:14,bold:true,color:'0.05 0.51 0.45',after:5,max:70});traco(48,y+4,547,y+4);y-=11}
+  function titulo(s) {
+    const parts=quebrarLargura(s,DIREITA-ESQUERDA,13,true)
+    garantir(parts.length*18+29)
+    y-=6
+    for(const part of parts){texto(part,ESQUERDA,y,13,true,'0.05 0.51 0.45');y-=18}
+    traco(ESQUERDA,y+4,DIREITA,y+4)
+    y-=8
+  }
+  function semana(s) {
+    const heading='SEMANA '+String(s.numero).padStart(2,'0')+'  |  '+s.titulo
+    const headingLines=quebrarLargura(heading,470,12,true)
+    // Não deixar um cabeçalho isolado no final de uma página.
+    garantir(headingLines.length*17+46)
+    y-=2
+    rect(ESQUERDA,y-(headingLines.length*17+9),498,headingLines.length*17+19,'0.92 0.97 0.96')
+    rect(ESQUERDA,y-(headingLines.length*17+9),4,headingLines.length*17+19,'0.06 0.65 0.53')
+    for(const part of headingLines) { texto(part,ESQUERDA+12,y-3,12,true,'0.05 0.39 0.38');y-=17 }
+    y-=17
+    linha(s.foco,{size:9.5,after:5,color:'0.25 0.36 0.45'})
+    for(const [i,t] of s.tarefas.entries()) {
+      const sz=9.5, lh=13
+      const parts=quebrarLargura(t,459,sz,false)
+      garantir(parts.length*lh+3)
+      texto(String(i+1)+'.',ESQUERDA+7,y,sz,true,'0.05 0.51 0.45')
+      for(const part of parts){texto(part,ESQUERDA+29,y,sz);y-=lh}
+      y-=1
+    }
+    garantir(37) // manter a evidência e o critério de avaliação juntos
+    linha('Evidência: '+s.entregavel,{size:9.5,bold:true,after:2})
+    linha('Como medir: '+s.metrica,{size:9.5,after:8})
+  }
+
   iniciar()
   titulo(plano.titulo)
-  linha('Data de geração: '+new Intl.DateTimeFormat('pt-PT',{dateStyle:'medium',timeZone:'UTC'}).format(date),{size:9,after:5})
-  linha('Área: '+request.area+'  |  Situação: '+request.situacao,{bold:true,after:6,max:78})
-  linha('Objectivo: '+request.objetivo,{after:7})
-  linha('Disponibilidade: '+request.disponibilidade+'  |  Internet: '+request.internet,{after:7})
-  if(request.dificuldade)linha('Dificuldade a considerar: '+request.dificuldade,{after:7})
+  linha('Data de geração: '+new Intl.DateTimeFormat('pt-PT',{dateStyle:'medium',timeZone:'UTC'}).format(date),{size:9,after:7})
+  linha('Área: '+request.area+'  |  Situação: '+request.situacao,{bold:true,after:4})
+  linha('Objectivo: '+request.objetivo,{after:5})
+  linha('Disponibilidade: '+request.disponibilidade+'  |  Internet: '+request.internet,{after:5})
+  if(request.dificuldade)linha('Dificuldade a considerar: '+request.dificuldade,{after:5})
   titulo('Diagnóstico e estratégia')
-  linha(plano.diagnostico,{after:7})
-  linha(plano.estrategia,{after:12})
-  for(const s of plano.semanas){
-    if(y<240)iniciar()
-    titulo('SEMANA '+s.numero+' - '+s.titulo)
-    linha(s.foco,{after:6})
-    for(const [i,t] of s.tarefas.entries())linha((i+1)+'. '+t,{indent:8,max:83,after:3})
-    linha('Evidência: '+s.entregavel,{bold:true,after:3})
-    linha('Como medir: '+s.metrica,{after:10})
-  }
-  if(y<220)iniciar()
+  linha(plano.diagnostico,{after:5})
+  linha(plano.estrategia,{after:10})
+  for(const s of plano.semanas) semana(s)
   titulo('Recursos e cuidados')
-  for(const t of [...plano.recursos,...plano.avisos])linha('- '+t,{after:5})
-  linha('Elaboração: '+plano.metodo,{size:9,after:5})
-  linha('Fonte de indicadores nacionais: https://data.worldbank.org/indicator/SL.UEM.1524.ZS?locations=MZ',{size:8,max:110})
+  for(const t of [...plano.recursos,...plano.avisos])linha('- '+t,{size:9.5,lineHeight:13,after:5})
   paginas.push(cmds.join('\n'))
   const objects=[]
   function add(obj){objects.push(obj);return objects.length}

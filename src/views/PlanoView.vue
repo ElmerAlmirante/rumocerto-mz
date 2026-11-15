@@ -24,7 +24,7 @@ watch(()=>rota.query.recurso,id=>{if(recursos.some(r=>r.id===id))plano.recursoId
 function pedido(){return {
   nome:plano.nome, email:email.value.trim(), area:plano.area, situacao:plano.situacao,
   disponibilidade:plano.disponibilidade, internet:plano.internet, objetivo:plano.objetivo,
-  competencias:plano.competencias, dificuldade:plano.dificuldade, consentimento:consentimento.value, website:website.value,
+  competencias:plano.competencias, dificuldade:plano.dificuldade, usarIA:plano.usarIA, consentimento:consentimento.value, website:website.value,
 }}
 function verificar(){erros.value=validarPedido(pedido());return Object.keys(erros.value).length===0}
 function criarPrevia(){
@@ -43,10 +43,10 @@ async function pedirPlano(){
     const conteudo=await resposta.json()
     if(!resposta.ok){erros.value=conteudo.erros||{};throw new Error(conteudo.erro||'Não foi possível criar o plano.')}
     gerado.value=conteudo.plano
-    trabalho.value={id:conteudo.id,agendadoPara:conteudo.agendadoPara,estado:conteudo.estado}
+    trabalho.value={id:conteudo.id,agendadoPara:conteudo.agendadoPara,estado:conteudo.estado,estadoIA:conteudo.estadoIA}
     token.value=conteudo.token
     estado.value='agendado'
-    mensagem.value='O EmailJS aceitou o primeiro e-mail. Verifica a recepção na caixa de entrada. O segundo envio foi agendado para aproximadamente 5 a 7 minutos após o pedido. Podes fechar o navegador.'
+    mensagem.value='O EmailJS aceitou o primeiro e-mail. O plano completo será enviado por e-mail dentro de aproximadamente 5 a 7 minutos. Podes fechar o navegador.' + (plano.usarIA && conteudo.estadoIA!=='sucesso'?' O serviço de IA não estava disponível e foi utilizado o percurso educativo gratuito.':'')
     email.value=''
     if(timer)clearInterval(timer)
     timer=setInterval(consultarEstado,30000)
@@ -97,10 +97,11 @@ onUnmounted(()=>{if(timer)clearInterval(timer)})
           <div class="field"><label for="dificuldade">Qual é a maior dificuldade que enfrentas? (opcional)</label><textarea id="dificuldade" v-model.trim="plano.dificuldade" maxlength="450" rows="2" placeholder="Ex.: tenho poucas horas livres e dados móveis limitados."/></div>
           <div class="field"><label for="email">E-mail onde queres receber os dois envios *</label><input id="email" v-model.trim="email" type="email" autocomplete="email" placeholder="exemplo@email.com" :aria-invalid="Boolean(erros.email)"/><small class="field-error" v-if="erros.email">{{ erros.email }}</small></div>
           <div class="field hidden-honeypot" aria-hidden="true"><label>Deixa este campo vazio<input v-model="website" tabindex="-1" autocomplete="off"/></label></div>
-          <label class="plan-consent"><input v-model="consentimento" type="checkbox"/><span>Autorizo o envio de dois e-mails com os dados que forneci. Sei que a IA é opcional, que o plano é educativo e que os dados serão processados por serviços externos quando a funcionalidade de envio estiver activa.</span></label>
+          <label class="plan-ai-option"><input v-model="plano.usarIA" type="checkbox"/><span><strong>Usar IA Gemini para tentar personalizar ainda mais o meu plano (opcional)</strong><small>Se seleccionares, a área, objectivo, situação, competências e dificuldades serão enviados ao serviço Gemini da Google. Não enviamos o teu e-mail para a IA. Se o serviço não estiver disponível, recebes na mesma um plano criado pelas regras educativas gratuitas.</small></span></label>
+          <label class="plan-consent"><input v-model="consentimento" type="checkbox"/><span>Autorizo o envio dos dois e-mails e o processamento dos dados que forneci pelo RumoCerto MZ e pelo serviço de e-mail. Sei que o plano é educativo e não garante emprego ou estágio.</span></label>
           <small class="field-error" v-if="erros.consentimento">{{ erros.consentimento }}</small>
           <div class="plan-submit-actions"><button class="btn btn-primary" type="submit" :disabled="estado==='enviando'">{{ estado==='enviando'?'A criar e a confirmar…':'Pedir o plano e os 2 e-mails ↗' }}</button><button class="btn btn-outline" type="button" @click="criarPrevia">Prévia gratuita</button><button type="button" class="link-button danger-link" @click="limparTudo">Limpar dados</button></div>
-          <p class="data-note">{{foiGuardado?'Dados do formulário guardados neste navegador (excepto e-mail).':'Os dados do formulário ficam neste navegador.'}} Nenhum pagamento é necessário. A geração automática pode recorrer à IA gratuita ou ao motor educativo de regras, conforme a disponibilidade.</p>
+          <p class="data-note">{{foiGuardado?'Dados do formulário guardados neste navegador (excepto e-mail).':'Os dados do formulário ficam neste navegador.'}} Nenhum pagamento é necessário. A utilização da IA depende da tua escolha e da disponibilidade do serviço. O motor de regras funciona sem IA.</p>
           <p v-if="mensagem" role="status" :class="estado==='erro'?'field-error':'success-message'">{{ mensagem }}</p>
         </form>
       </section>
@@ -108,7 +109,7 @@ onUnmounted(()=>{if(timer)clearInterval(timer)})
         <div class="card-heading"><div><span class="eyebrow">ETAPA 02</span><h2>O que vais receber</h2></div><span class="privacy-chip">30 dias</span></div>
         <div class="delivery-timeline"><div><strong>01 · Confirmação</strong><p>Logo após submeteres os dados, recebes um e-mail com as escolhas registadas.</p></div><div><strong>02 · Plano detalhado</strong><p>Aproximadamente 5 a 7 minutos depois, um segundo e-mail com quatro semanas de tarefas, metas e uma ligação privada para descarregar o PDF.</p></div><div><strong>03 · Continuidade</strong><p>Consulta o teu PDF e acompanha o progresso ao longo do mês. O plano não garante oportunidades de emprego.</p></div></div>
         <div v-if="trabalho" class="job-status" role="status"><strong>Estado do pedido: {{trabalho.estado}}</strong><p>Envio previsto: {{new Date(trabalho.agendadoPara).toLocaleString('pt-PT')}} (hora local do navegador). O servidor continua a processar mesmo que saias desta página.</p><button type="button" class="link-button" @click="consultarEstado">Actualizar estado</button></div>
-        <div v-if="gerado" class="plan-preview"><span class="eyebrow">O PLANO PREPARADO</span><h3>{{gerado.titulo}}</h3><p>{{gerado.diagnostico}}</p><span class="privacy-chip">{{ gerado.metodo }}</span><div class="mini-week" v-for="s in gerado.semanas" :key="s.numero"><h4>Semana {{s.numero}} — {{s.titulo}}</h4><p>{{s.foco}}</p><ul><li v-for="(t,i) in s.tarefas" :key="i">{{t}}</li></ul><small>Entregável: {{s.entregavel}}</small></div><button type="button" class="btn btn-primary pdf-button" @click="descarregar">Descarregar PDF do plano ↓</button></div>
+        <div v-if="gerado" class="plan-preview"><span class="eyebrow">O PLANO PREPARADO</span><h3>{{gerado.titulo}}</h3><p>{{gerado.diagnostico}}</p><span class="privacy-chip">{{ gerado.metodo }}</span><p class="plan-time-note">Cada tarefa indica uma duração sugerida. Ajusta o ritmo às tuas condições reais.</p><div class="mini-week" v-for="s in gerado.semanas" :key="s.numero"><h4>Semana {{s.numero}} — {{s.titulo}}</h4><p>{{s.foco}}</p><ul><li v-for="(t,i) in s.tarefas" :key="i">{{t}}</li></ul><small>Entregável: {{s.entregavel}}</small></div><button type="button" class="btn btn-primary pdf-button" @click="descarregar">Descarregar PDF do plano ↓</button></div>
         <div v-else class="plan-preview-empty"><span class="eyebrow">ANTES DE COMEÇARES</span><h3>Um plano útil adapta-se à vida real.</h3><p>Não sugerimos cursos pagos, candidaturas inventadas nem metas impossíveis para quem tem pouco tempo ou acesso limitado à Internet.</p><p><strong>Fonte de contexto:</strong> indicadores de desemprego juvenil para Moçambique publicados pelo Banco Mundial; não são previsões individuais.</p></div>
       </aside>
     </div>

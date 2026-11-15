@@ -12,20 +12,8 @@ backend/.dev.vars
 backend/.env*
 !backend/.dev.vars.example
 
-# Dependências e compilação
-node_modules/
-dist/
-
-# Configurações privadas
-.env
-.env.local
-.env.*.local
-**/.dev.vars
-**/.dev.vars.*
-!**/.dev.vars.example
-
-# Dados locais Cloudflare
+# Cloudflare: estado local e bases simuladas
 **/.wrangler/
-
-# Ficheiros do macOS
-.DS_Store
+# Temporários e cópias de segurança
+*.log
+*.bak

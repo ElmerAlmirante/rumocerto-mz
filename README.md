@@ -1,10 +1,21 @@
-# RumoCerto MZ — Versão 2.1 gratuita — links PDF e agendamento corrigidos
+# RumoCerto MZ — Versão 2.3 gratuita — planos profissionais e PDF optimizado
 
 **Grupo 8 · Programação Web II · ISUTC · 2026**
 
 Aplicação Vue 3 para jovens moçambicanos: indicadores reais de desemprego juvenil, criação de planos educativos personalizados de 30 dias em PDF e, **após configurar os serviços gratuitos**, dois e-mails: confirmação imediata e entrega agendada cerca de cinco minutos depois.
 
-> **Estado da versão:** o código-fonte e os testes automatizados estão preparados. A API externa Gemini/EmailJS e a fila agendada Cloudflare **não foram activadas numa conta real nem testadas de ponta a ponta em produção**. Não dizer ao docente que o segundo e-mail foi enviado até haver captura de prova real.
+**Versão v2.3:** actualização académica preparada em 13/11/2026. A versão v2.1 já tinha sido testada no site público e recebia os dois e-mails. Os novos ficheiros v2.3 têm **26 testes automatizados aprovados localmente**, mas ainda necessitam do deploy de produção e de um teste real de e-mail e Gemini. O código não deve ser apresentado ao docente como publicado antes dessas verificações.
+
+**Site público actual (versão anterior até fazeres o deploy):** https://k6n9.github.io/rumocerto-mz/  ·  **API:** https://rumocerto-mz-api.k3n4.workers.dev/api/saude
+
+**Novidades v2.3:**
+- Gerador PDF com melhor paginação, quatro semanas, tarefas com estimativas de tempo, logótipo e rodapé informativo.
+- 12 percursos concretos sem IA (Vue, Web, Python, redes, dados, portefólio, entrevistas, negócios, gestão, educação, saúde e design).
+- IA Gemini apenas com opção seleccionada; quando falha regressa ao motor gratuito, com código de diagnóstico sem dados privados.
+- Dois templates EmailJS HTML prontos para colar no painel e botão de PDF no segundo e-mail.
+- Checklist de segurança, manual de actualização/rollback e guião de entrega académica.
+
+**Instalação e publicação:** [docs/INSTALAR_V2_3.md](docs/INSTALAR_V2_3.md). **Modelos dos e-mails:** [docs/emailjs/INSTRUCOES.md](docs/emailjs/INSTRUCOES.md).
 
 ## O que oferece
 
@@ -50,7 +61,7 @@ Sem backend configurado: seleccionar área, situação e objectivo, clicar **Pr�
 ### Testes automatizados
 
 ```bash
-npm test     # 16 testes: 10 de formatação + 9 de backend (simulado)
+npm test     # 26 testes automatizados (frontend e backend, sem consumir APIs reais)
 npm run build
 npm run preview
 ```

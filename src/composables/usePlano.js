@@ -1,7 +1,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 
 const CHAVE = 'rumocerto:plano:v1'
-const inicial = () => ({ area: '', situacao: '', objetivo: '', recursoId: 'cv', notas: '', concluido: [], disponibilidade: '3 a 5 horas por semana', internet: 'Acesso limitado a dados móveis', competencias: '', dificuldade: '', nome: '' })
+const inicial = () => ({ area: '', situacao: '', objetivo: '', recursoId: 'cv', notas: '', concluido: [], disponibilidade: '3 a 5 horas por semana', internet: 'Acesso limitado a dados móveis', competencias: '', dificuldade: '', nome: '', usarIA: false })
 
 function recuperar() {
   try {

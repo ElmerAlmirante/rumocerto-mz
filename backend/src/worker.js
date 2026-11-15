@@ -1,4 +1,4 @@
-import { gerarPlano, validarPedido } from './planner.js'
+import { gerarPlanoComDiagnostico, validarPedido } from './planner.js'
 import { criarPDF } from './pdf.js'
 
 const minutos5 = 5 * 60 * 1000
@@ -10,13 +10,13 @@ function cors(request,env) {
   const allowed=String(env.ALLOWED_ORIGINS||'http://localhost:5173,http://localhost:4173').split(',').map(s=>s.trim())
   return allowed.includes(origin) ? {'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Methods':'POST, GET, OPTIONS','Access-Control-Allow-Headers':'Content-Type','Vary':'Origin'} : {}
 }
-function padraoEnvio(job) {return {to_email:job.email, nome:job.nome||'Jovem', area:job.pedido.area, situacao:job.pedido.situacao, objetivo:job.pedido.objetivo, passos:job.plano.semanas[0].tarefas.slice(0,3).map((s,i)=>`${i+1}. ${s}`).join('\n'), notas:job.pedido.dificuldade||'Sem notas adicionais', subject:'Recebemos as tuas escolhas — RumoCerto MZ', prazo:'Cerca de 5 minutos'}}
+function padraoEnvio(job) {return {to_email:job.email, nome:job.nome||'Jovem', area:job.pedido.area, situacao:job.pedido.situacao, objetivo:job.pedido.objetivo, disponibilidade:job.pedido.disponibilidade, internet:job.pedido.internet, usar_ia:job.pedido.usarIA?'Sim, quando disponível':'Não', passos:job.plano.semanas[0].tarefas.slice(0,3).map((s,i)=>`${i+1}. ${s}`).join('\n'), notas:job.pedido.dificuldade||'Sem notas adicionais', subject:'Recebemos as tuas escolhas — RumoCerto MZ', prazo:'Cerca de 5 a 7 minutos'}}
 async function emailJS(env,template,params) {
   if(!env.EMAILJS_SERVICE_ID || !env.EMAILJS_PUBLIC_KEY || !template)throw new Error('E-mail não configurado no Worker')
   const body={service_id:env.EMAILJS_SERVICE_ID,template_id:template,user_id:env.EMAILJS_PUBLIC_KEY,template_params:params}
   if(env.EMAILJS_PRIVATE_KEY) body.accessToken=env.EMAILJS_PRIVATE_KEY
   const r=await fetch('https://api.emailjs.com/api/v1.0/email/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-  if(!r.ok)throw new Error('EmailJS: '+r.status+' '+(await r.text()).slice(0,120))
+  if(!r.ok)throw new Error('EmailJS HTTP '+r.status)
 }
 async function digest(token) {
   const bytes=new TextEncoder().encode(token)
@@ -24,7 +24,7 @@ async function digest(token) {
   return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('')
 }
 function token() {const b=crypto.getRandomValues(new Uint8Array(24));return [...b].map(n=>n.toString(16).padStart(2,'0')).join('')}
-function publicStatus(job) {return {id:job.id,estado:job.estado,agendadoPara:new Date(job.agendadoPara).toISOString(),enviadoEm:job.enviadoEm||null,metodo:job.plano.metodo,titulo:job.plano.titulo}}
+function publicStatus(job) {return {id:job.id,estado:job.estado,agendadoPara:new Date(job.agendadoPara).toISOString(),enviadoEm:job.enviadoEm||null,metodo:job.plano.metodo,titulo:job.plano.titulo,estadoIA:job.estadoIA||'nao_solicitada'}}
 async function criar(request,env) {
   if(!env.JOBS)return err('Base de dados KV por configurar.',503)
   if(!env.EMAILJS_TEMPLATE_CONFIRM || !env.EMAILJS_TEMPLATE_PLAN)return err('Configura os dois templates do EmailJS no Worker.',503)
@@ -40,12 +40,12 @@ async function criar(request,env) {
   const ultimo=Number(await env.JOBS.get(ipkey)||0)
   if(Date.now()-ultimo<90_000)return err('Aguarda pelo menos 90 segundos antes de pedir outro plano.',429)
   // Não confiar em afirmações de IA: é uma orientação educativa, sem garantias de contratação.
-  const pedido={nome:String(data.nome||'').trim(),area:data.area,situacao:data.situacao,objetivo:String(data.objetivo).trim(),disponibilidade:data.disponibilidade,internet:data.internet,competencias:String(data.competencias||'').trim(),dificuldade:String(data.dificuldade||'').trim()}
-  const plano=await gerarPlano(pedido,env)
+  const pedido={nome:String(data.nome||'').trim(),area:data.area,situacao:data.situacao,objetivo:String(data.objetivo).trim(),disponibilidade:data.disponibilidade,internet:data.internet,competencias:String(data.competencias||'').trim(),dificuldade:String(data.dificuldade||'').trim(),usarIA:data.usarIA===true}
+  const {plano,estadoIA}=await gerarPlanoComDiagnostico(pedido,env)
   const id=crypto.randomUUID()
   const auth=token()
   const now=Date.now()
-  const job={id,hash:await digest(auth),downloadToken:auth,nome:pedido.nome,email:String(data.email).trim(),pedido,plano,estado:'pendente',agendadoPara:now+minutos5,criadoEm:new Date(now).toISOString(),tentativas:0}
+  const job={id,hash:await digest(auth),downloadToken:auth,nome:pedido.nome,email:String(data.email).trim(),pedido,plano,estadoIA,estado:'pendente',agendadoPara:now+minutos5,criadoEm:new Date(now).toISOString(),tentativas:0}
   // Confirmação enviada antes de se aceitar a tarefa na fila.
   try{await emailJS(env,env.EMAILJS_TEMPLATE_CONFIRM,padraoEnvio(job))}
   catch(e){console.error('Falha ao enviar confirmação',e.message);return err('Não foi possível enviar o primeiro e-mail. Verifica a configuração do serviço.',502)}
@@ -63,7 +63,7 @@ async function obter(request,env,id,download=false) {
   if(await digest(token)!==job.hash)return err('Acesso não autorizado.',401)
   if(!download)return json(publicStatus(job))
   const pdf=criarPDF(job.pedido,job.plano)
-  return new Response(pdf,{headers:{'Content-Type':'application/pdf','Content-Disposition':'attachment; filename="RumoCerto_MZ_Plano_30_Dias.pdf"','Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'}})
+  return new Response(pdf,{headers:{'Content-Type':'application/pdf','Content-Disposition':'attachment; filename="RumoCerto_MZ_Plano_30_Dias.pdf"','Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex, nofollow'}})
 }
 /** Ligação de PDF criada pelo servidor; não é possível enviar URLs locais em produção. */
 function linkPlanoPDF(env,job) {
@@ -89,6 +89,9 @@ async function enviarPendente(job,env){
     area:String(job.pedido.area),
     situacao:String(job.pedido.situacao),
     objetivo:String(job.pedido.objetivo),
+    perfil:String(job.plano.perfil||job.pedido.area),
+    disponibilidade:String(job.pedido.disponibilidade),
+    internet:String(job.pedido.internet),
     prazo:new Date(job.agendadoPara).toISOString(),
   }
   await emailJS(env,env.EMAILJS_TEMPLATE_PLAN,parametros)
