@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePlano } from '../composables/usePlano.js'
 import { recursos } from '../data/recursos.js'
@@ -15,34 +15,59 @@ const erros = ref({})
 const estado = ref('parado')
 const mensagem = ref('')
 const gerado = ref(null)
+const pedidoDoPDF = ref(null)
 const trabalho = ref(null)
 const token = ref('')
 const backend = String(import.meta.env.VITE_WORKER_URL || '').replace(/\/$/,'')
 let timer = null
 const areaRecurso = computed(() => recursos.find(r=>r.id===plano.recursoId) || recursos[0])
+const descricoesEstado = {pendente:'A preparar o envio', enviado:'Segundo e-mail enviado', falhou:'Falha no envio'}
+const estadoLegivel = computed(() => descricoesEstado[trabalho.value?.estado] || 'A processar')
+function tituloSemana(s) {
+  return String(s.titulo||'Actividades da semana')
+    .replace(/^\s*semana\s*0*[1-4]\s*[:\-–—|]\s*/i,'').trim() || 'Actividades da semana'
+}
+function tempoSemana(s) {
+  return (s.tarefas||[]).reduce((n,t)=>n+Number(String(t).match(/^\s*\((\d+)\s*min\)/i)?.[1]||0),0)
+}
+
 watch(()=>rota.query.recurso,id=>{if(recursos.some(r=>r.id===id))plano.recursoId=id},{immediate:true})
 function pedido(){return {
   nome:plano.nome, email:email.value.trim(), area:plano.area, situacao:plano.situacao,
   disponibilidade:plano.disponibilidade, internet:plano.internet, objetivo:plano.objetivo,
   competencias:plano.competencias, dificuldade:plano.dificuldade, usarIA:plano.usarIA, consentimento:consentimento.value, website:website.value,
 }}
-function verificar(){erros.value=validarPedido(pedido());return Object.keys(erros.value).length===0}
+async function verificar(){
+  erros.value=validarPedido(pedido())
+  const valido=Object.keys(erros.value).length===0
+  if(!valido){
+    await nextTick()
+    // Focar o primeiro campo assinalado, mantendo o fluxo do formulário.
+    const campo=Object.keys(erros.value)[0]
+    const mapa={area:'area',situacao:'situacao',objetivo:'objetivo',email:'email',consentimento:'consentimento'}
+    document.getElementById(mapa[campo]||campo)?.focus()
+  }
+  return valido
+}
 function criarPrevia(){
   if(!plano.area || !plano.situacao || (plano.objetivo||'').trim().length<12){mensagem.value='Indica área, situação e objectivo (mínimo de 12 caracteres) para visualizar uma prévia.';return}
-  gerado.value=construirPlanoBase(plano)
-  mensagem.value='Prévia gratuita criada no navegador. Para receber dois e-mails, configura o Worker no servidor.'
+  pedidoDoPDF.value={...pedido()}
+  gerado.value=construirPlanoBase(pedidoDoPDF.value)
+  mensagem.value='Prévia gratuita criada no navegador. Para receber os dois e-mails, preenche o e-mail, autoriza o envio e selecciona «Pedir o plano».'
   estado.value='previa'
 }
 async function pedirPlano(){
   mensagem.value=''
-  if(!verificar()){mensagem.value='Verifica os campos assinalados.';estado.value='erro';return}
+  if(!(await verificar())){mensagem.value='Verifica os campos assinalados.';estado.value='erro';return}
   if(!backend){mensagem.value='O backend de envios agendados ainda não foi configurado. Podes criar uma prévia local e descarregar o PDF.';estado.value='erro';return}
   estado.value='enviando'
+  const dadosPedido={...pedido()}
   try {
-    const resposta=await fetch(backend+'/api/planos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pedido())})
+    const resposta=await fetch(backend+'/api/planos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dadosPedido)})
     const conteudo=await resposta.json()
     if(!resposta.ok){erros.value=conteudo.erros||{};throw new Error(conteudo.erro||'Não foi possível criar o plano.')}
     gerado.value=conteudo.plano
+    pedidoDoPDF.value=dadosPedido
     trabalho.value={id:conteudo.id,agendadoPara:conteudo.agendadoPara,estado:conteudo.estado,estadoIA:conteudo.estadoIA}
     token.value=conteudo.token
     estado.value='agendado'
@@ -64,11 +89,11 @@ async function consultarEstado(){
   }catch{/* Indicador de estado facultativo; o envio continua no servidor. */}
 }
 function limparTudo(){
-  limpar();email.value='';consentimento.value=false;website.value='';erros.value={};gerado.value=null;trabalho.value=null;token.value='';estado.value='parado';mensagem.value='';if(timer)clearInterval(timer)
+  limpar();email.value='';consentimento.value=false;website.value='';erros.value={};gerado.value=null;pedidoDoPDF.value=null;trabalho.value=null;token.value='';estado.value='parado';mensagem.value='';if(timer)clearInterval(timer)
 }
 function descarregar(){
   if(!gerado.value)return
-  const bytes=criarPDF(plano,gerado.value)
+  const bytes=criarPDF(pedidoDoPDF.value||plano,gerado.value)
   const blob=new Blob([bytes],{type:'application/pdf'})
   const href=URL.createObjectURL(blob)
   const a=document.createElement('a');a.href=href;a.download='RumoCerto_MZ_Plano_30_Dias.pdf';a.click()
@@ -98,18 +123,18 @@ onUnmounted(()=>{if(timer)clearInterval(timer)})
           <div class="field"><label for="email">E-mail onde queres receber os dois envios *</label><input id="email" v-model.trim="email" type="email" autocomplete="email" placeholder="exemplo@email.com" :aria-invalid="Boolean(erros.email)"/><small class="field-error" v-if="erros.email">{{ erros.email }}</small></div>
           <div class="field hidden-honeypot" aria-hidden="true"><label>Deixa este campo vazio<input v-model="website" tabindex="-1" autocomplete="off"/></label></div>
           <label class="plan-ai-option"><input v-model="plano.usarIA" type="checkbox"/><span><strong>Usar IA Gemini para tentar personalizar ainda mais o meu plano (opcional)</strong><small>Se seleccionares, a área, objectivo, situação, competências e dificuldades serão enviados ao serviço Gemini da Google. Não enviamos o teu e-mail para a IA. Se o serviço não estiver disponível, recebes na mesma um plano criado pelas regras educativas gratuitas.</small></span></label>
-          <label class="plan-consent"><input v-model="consentimento" type="checkbox"/><span>Autorizo o envio dos dois e-mails e o processamento dos dados que forneci pelo RumoCerto MZ e pelo serviço de e-mail. Sei que o plano é educativo e não garante emprego ou estágio.</span></label>
+          <label class="plan-consent"><input id="consentimento" v-model="consentimento" type="checkbox" :aria-invalid="Boolean(erros.consentimento)"/><span>Autorizo o envio dos dois e-mails e o processamento dos dados que forneci pelo RumoCerto MZ e pelo serviço de e-mail. Sei que o plano é educativo e não garante emprego ou estágio.</span></label>
           <small class="field-error" v-if="erros.consentimento">{{ erros.consentimento }}</small>
           <div class="plan-submit-actions"><button class="btn btn-primary" type="submit" :disabled="estado==='enviando'">{{ estado==='enviando'?'A criar e a confirmar…':'Pedir o plano e os 2 e-mails ↗' }}</button><button class="btn btn-outline" type="button" @click="criarPrevia">Prévia gratuita</button><button type="button" class="link-button danger-link" @click="limparTudo">Limpar dados</button></div>
           <p class="data-note">{{foiGuardado?'Dados do formulário guardados neste navegador (excepto e-mail).':'Os dados do formulário ficam neste navegador.'}} Nenhum pagamento é necessário. A utilização da IA depende da tua escolha e da disponibilidade do serviço. O motor de regras funciona sem IA.</p>
-          <p v-if="mensagem" role="status" :class="estado==='erro'?'field-error':'success-message'">{{ mensagem }}</p>
+          <p v-if="mensagem" :role="estado==='erro'?'alert':'status'" aria-live="polite" :class="estado==='erro'?'field-error':'success-message'">{{ mensagem }}</p>
         </form>
       </section>
       <aside class="plan-steps-card" aria-label="Percurso do pedido">
         <div class="card-heading"><div><span class="eyebrow">ETAPA 02</span><h2>O que vais receber</h2></div><span class="privacy-chip">30 dias</span></div>
         <div class="delivery-timeline"><div><strong>01 · Confirmação</strong><p>Logo após submeteres os dados, recebes um e-mail com as escolhas registadas.</p></div><div><strong>02 · Plano detalhado</strong><p>Aproximadamente 5 a 7 minutos depois, um segundo e-mail com quatro semanas de tarefas, metas e uma ligação privada para descarregar o PDF.</p></div><div><strong>03 · Continuidade</strong><p>Consulta o teu PDF e acompanha o progresso ao longo do mês. O plano não garante oportunidades de emprego.</p></div></div>
-        <div v-if="trabalho" class="job-status" role="status"><strong>Estado do pedido: {{trabalho.estado}}</strong><p>Envio previsto: {{new Date(trabalho.agendadoPara).toLocaleString('pt-PT')}} (hora local do navegador). O servidor continua a processar mesmo que saias desta página.</p><button type="button" class="link-button" @click="consultarEstado">Actualizar estado</button></div>
-        <div v-if="gerado" class="plan-preview"><span class="eyebrow">O PLANO PREPARADO</span><h3>{{gerado.titulo}}</h3><p>{{gerado.diagnostico}}</p><span class="privacy-chip">{{ gerado.metodo }}</span><p class="plan-time-note">Cada tarefa indica uma duração sugerida. Ajusta o ritmo às tuas condições reais.</p><div class="mini-week" v-for="s in gerado.semanas" :key="s.numero"><h4>Semana {{s.numero}} — {{s.titulo}}</h4><p>{{s.foco}}</p><ul><li v-for="(t,i) in s.tarefas" :key="i">{{t}}</li></ul><small>Entregável: {{s.entregavel}}</small></div><button type="button" class="btn btn-primary pdf-button" @click="descarregar">Descarregar PDF do plano ↓</button></div>
+        <div v-if="trabalho" class="job-status" role="status"><strong>Estado do pedido: {{estadoLegivel}}</strong><p>Envio previsto: {{new Date(trabalho.agendadoPara).toLocaleString('pt-PT')}} (hora local do navegador). O servidor continua a processar mesmo que saias desta página.</p><button type="button" class="link-button" @click="consultarEstado">Actualizar estado</button></div>
+        <div v-if="gerado" class="plan-preview"><span class="eyebrow">O PLANO PREPARADO</span><h3>{{gerado.titulo}}</h3><p>{{gerado.diagnostico}}</p><span class="privacy-chip">{{ gerado.metodo }}</span><p class="plan-time-note">Cada tarefa indica uma duração sugerida. Ajusta o ritmo às tuas condições reais.</p><div class="mini-week" v-for="s in gerado.semanas" :key="s.numero"><h4>Semana {{s.numero}} — {{tituloSemana(s)}}</h4><p>{{s.foco}}</p><p v-if="tempoSemana(s)>0" class="week-duration">{{tempoSemana(s)}} min de actividades sugeridas</p><ul><li v-for="(t,i) in s.tarefas" :key="i">{{t}}</li></ul><small>Entregável: {{s.entregavel}}</small></div><button type="button" class="btn btn-primary pdf-button" @click="descarregar">Descarregar PDF do plano ↓</button></div>
         <div v-else class="plan-preview-empty"><span class="eyebrow">ANTES DE COMEÇARES</span><h3>Um plano útil adapta-se à vida real.</h3><p>Não sugerimos cursos pagos, candidaturas inventadas nem metas impossíveis para quem tem pouco tempo ou acesso limitado à Internet.</p><p><strong>Fonte de contexto:</strong> indicadores de desemprego juvenil para Moçambique publicados pelo Banco Mundial; não são previsões individuais.</p></div>
       </aside>
     </div>

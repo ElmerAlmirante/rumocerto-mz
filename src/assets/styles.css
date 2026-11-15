@@ -49,3 +49,16 @@
 .plan-ai-option strong{display:block;font-size:13px;margin-bottom:5px}
 .plan-ai-option small{display:block;color:#547081;line-height:1.6}
 .plan-time-note{color:#527682;font-size:12px;line-height:1.5;margin:12px 0}
+
+/* v2.4 — retoques de legibilidade e acessibilidade em ecrãs pequenos. */
+.week-duration{font-size:12px;font-weight:700;color:#087d71;margin:6px 0 12px}
+.job-status .link-button{min-height:44px;padding:8px 0}
+.plan-form-card input[type="email"],.plan-form-card textarea{max-width:100%}
+.plan-preview h3,.plan-preview h4,.job-status,.resource-card{overflow-wrap:anywhere}
+@media (max-width:480px){
+  .plan-form-card,.plan-steps-card{padding:18px}
+  .page-heading h1{font-size:clamp(29px,8vw,38px)}
+  .plan-submit-actions .btn{width:100%;min-height:46px}
+  .plan-submit-actions .link-button{min-height:44px}
+  .mini-week{overflow-wrap:anywhere}
+}

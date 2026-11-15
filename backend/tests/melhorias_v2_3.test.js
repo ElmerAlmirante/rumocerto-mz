@@ -96,3 +96,21 @@ test('templates EmailJS possuem URLs e nomes de variáveis compatíveis',()=>{
   assert.match(b,/{{titulo_plano}}/)
   assert.doesNotMatch(a+b,/{{{/)
 })
+
+test('PDF v2.4 evita duplicação de Semana e mostra carga estimada',()=>{
+  const pedido=p('Criar um portefólio de gestão','Administração e gestão',{disponibilidade:'Até 2 horas por semana'})
+  const plano=construirPlanoBase(pedido)
+  plano.semanas[0].titulo='Semana 1: Organização e planeamento'
+  const pdf=new TextDecoder('latin1').decode(criarPDF(pedido,plano,{date:new Date('2026-11-15T22:30:00Z')}))
+  assert.match(pdf,/SEMANA 01 \| Organização e planeamento/)
+  assert.doesNotMatch(pdf,/SEMANA 01 \| Semana 1/)
+  assert.match(pdf,/Tempo sugerido para as actividades:/)
+  assert.equal((pdf.match(/SEMANA 0[1-4]/g)||[]).length,4)
+})
+test('Frontend v2.4 protege os dados do PDF e informa correctamente a prévia',()=>{
+  const view=readFileSync(new URL('../../src/views/PlanoView.vue',import.meta.url),'utf8')
+  assert.match(view,/pedidoDoPDF\.value\|\|plano/)
+  assert.match(view,/const dadosPedido=\{\.\.\.pedido\(\)\}/)
+  assert.doesNotMatch(view,/Para receber dois e-mails, configura o Worker/)
+  assert.match(view,/tituloSemana\(s\)/)
+})

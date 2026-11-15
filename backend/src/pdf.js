@@ -99,9 +99,13 @@ export function criarPDF(request, plano, options={}) {
     y-=8
   }
   function semana(s) {
-    const heading='SEMANA '+String(s.numero).padStart(2,'0')+'  |  '+s.titulo
+    // O Gemini pode devolver "Semana 1: ..."; o prefixo já é impresso por nós.
+    const tituloLimpo=String(s.titulo||'Actividades da semana')
+      .replace(/^\s*semana\s*0*[1-4]\s*[:\-–—|]\s*/i,'').trim() || 'Actividades da semana'
+    const heading='SEMANA '+String(s.numero).padStart(2,'0')+'  |  '+tituloLimpo
     const headingLines=quebrarLargura(heading,470,12,true)
-    // Não deixar um cabeçalho isolado no final de uma página.
+    const minutos=s.tarefas.reduce((total,t)=>total+Number(String(t).match(/^\s*\((\d+)\s*min\)/i)?.[1]||0),0)
+    // Não deixar o título da semana isolado no final da página.
     garantir(headingLines.length*17+46)
     y-=2
     rect(ESQUERDA,y-(headingLines.length*17+9),498,headingLines.length*17+19,'0.92 0.97 0.96')
@@ -109,10 +113,15 @@ export function criarPDF(request, plano, options={}) {
     for(const part of headingLines) { texto(part,ESQUERDA+12,y-3,12,true,'0.05 0.39 0.38');y-=17 }
     y-=17
     linha(s.foco,{size:9.5,after:5,color:'0.25 0.36 0.45'})
+    // Duração estimada apenas a partir dos valores realmente presentes nas tarefas.
+    if(minutos>0)linha('Tempo sugerido para as actividades: '+minutos+' minutos (ajusta ao teu ritmo).',
+      {size:8.5,after:5,color:'0.25 0.43 0.46'})
     for(const [i,t] of s.tarefas.entries()) {
       const sz=9.5, lh=13
       const parts=quebrarLargura(t,459,sz,false)
-      garantir(parts.length*lh+3)
+      // Se esta for a última tarefa, colocá-la junto da evidência e da métrica.
+      const margemFinal=i===s.tarefas.length-1?53:3
+      garantir(parts.length*lh+margemFinal)
       texto(String(i+1)+'.',ESQUERDA+7,y,sz,true,'0.05 0.51 0.45')
       for(const part of parts){texto(part,ESQUERDA+29,y,sz);y-=lh}
       y-=1
@@ -124,7 +133,7 @@ export function criarPDF(request, plano, options={}) {
 
   iniciar()
   titulo(plano.titulo)
-  linha('Data de geração: '+new Intl.DateTimeFormat('pt-PT',{dateStyle:'medium',timeZone:'UTC'}).format(date),{size:9,after:7})
+  linha('Data de geração: '+new Intl.DateTimeFormat('pt-PT',{dateStyle:'medium',timeZone:'Africa/Maputo'}).format(date),{size:9,after:7})
   linha('Área: '+request.area+'  |  Situação: '+request.situacao,{bold:true,after:4})
   linha('Objectivo: '+request.objetivo,{after:5})
   linha('Disponibilidade: '+request.disponibilidade+'  |  Internet: '+request.internet,{after:5})
