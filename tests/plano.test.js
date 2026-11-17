@@ -69,7 +69,7 @@ test('formata taxa com percentagem', () => assert.match(formatarTaxa(11.6), /%/)
 test('preserva valor monetário e sinal de tarefa como texto legível no PDF', () => {
   const p = { ...perfil(), objetivo: 'Preparar CV com 50€ de orçamento e tarefas ✓ para candidatura' }
   const pdf = new TextDecoder('latin1').decode(gerarPdf(p, gerarPlano(p)))
-  assert.match(pdf, /50\x80/)
+  assert.match(pdf, /50[\x80\u20AC]/)
   assert.match(pdf, /\[concluído\]/)
 })
 test('recupera plano especializado de redes informáticas', () => {
