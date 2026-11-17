@@ -1,143 +1,83 @@
-# RumoCerto MZ — Versão 2.4 — orientação profissional gratuita
+# RumoCerto MZ — versão 3.6
 
-**Grupo 8 · Programação Web II · ISUTC · 2026**
+**Projecto Final de Programação Web II · Grupo 8 · LECC31 · ISUTC · 2026**
 
-Aplicação Vue 3 para jovens moçambicanos: indicadores reais de desemprego juvenil, criação de planos educativos personalizados de 30 dias em PDF e, **após configurar os serviços gratuitos**, dois e-mails: confirmação imediata e entrega agendada cerca de cinco minutos depois.
+Aplicação de orientação profissional para jovens moçambicanos. Permite consultar indicadores oficiais do Banco Mundial, criar um plano educativo de 30 dias, descarregar o documento em PDF e acompanhar as tarefas concluídas. O envio opcional por e-mail utiliza Cloudflare Workers, Durable Objects (SQLite) com alarmes e EmailJS. O Gemini pode ser utilizado para personalizar o texto do diagnóstico, com alternativa gratuita sem serviços de IA.
 
-**Estado verificado em 15/11/2026:** frontend v2.3 publicado no GitHub Pages, Worker público activo, dois e-mails recebidos e um plano PDF gerado com Gemini. A v2.4 é uma revisão incremental de qualidade, a validar em pull request antes de publicar; ainda não se deve apresentá-la como versão pública.
+**Site:** https://k6n9.github.io/rumocerto-mz/  
+**Repositório:** https://github.com/K6N9/rumocerto-mz
 
-**Site publicado:** https://k6n9.github.io/rumocerto-mz/  ·  **API:** https://rumocerto-mz-api.k3n4.workers.dev/api/saude
+A versão deste pacote é a **3.6.0**. O site público só apresentará estas alterações depois de a versão ser integrada no branch `main` e publicada. A comunicação exige também a publicação do Worker actualizado. O frontend consulta `/api/saude` e verifica a versão do protocolo antes de enviar pedidos.
 
-**Retoques v2.4:** títulos de semanas sem repetições, tempo sugerido por semana, melhor quebra de página do PDF, prévia com instruções correctas, estados legíveis, formulário melhor em telemóveis e dados do PDF fixados no momento do pedido. Ver [docs/RETOQUES_FINAIS_V2_4.md](docs/RETOQUES_FINAIS_V2_4.md).
+## Interface e funcionalidades
 
-**Novidades v2.3:**
-- Gerador PDF com melhor paginação, quatro semanas, tarefas com estimativas de tempo, logótipo e rodapé informativo.
-- 12 percursos concretos sem IA (Vue, Web, Python, redes, dados, portefólio, entrevistas, negócios, gestão, educação, saúde e design).
-- IA Gemini apenas com opção seleccionada; quando falha regressa ao motor gratuito, com código de diagnóstico sem dados privados.
-- Dois templates EmailJS HTML prontos para colar no painel e botão de PDF no segundo e-mail.
-- Checklist de segurança, manual de actualização/rollback e guião de entrega académica.
+A interface da versão 3.6 organiza a criação do plano em três passos, mantém campos opcionais recolhidos, apresenta um resumo de quatro semanas e mostra tarefas e progresso por semana. A página inicial adapta-se quando já existe um plano guardado. A página inicial mostra um indicador em destaque, mantendo os restantes na página de indicadores. A tabela de dados históricos apresenta a série completa.
 
-**Instalação e publicação:** [docs/INSTALAR_V2_3.md](docs/INSTALAR_V2_3.md). **Modelos dos e-mails:** [docs/emailjs/INSTRUCOES.md](docs/emailjs/INSTRUCOES.md).
+## Equipa
 
-## O que oferece
-
-- Vue 3, Vite, Vue Router (rota de detalhe por parâmetro + página 404), componentes com props, composables, CSS responsivo em português;
-- `fetch` à API pública do Banco Mundial para Moçambique, com carregamento, erro, vazio, gráfico e exportação CSV;
-- formulário detalhado: situação actual, área, objectivo, disponibilidade, condições de internet, competências e dificuldades;
-- plano de 30 dias com 4 semanas, tarefas e entregáveis verificáveis; prévia e PDF grátis mesmo sem backend;
-- IA Gemini opcional em **modalidade gratuita**, sempre com motor de regras educativo como alternativa quando a quota ou a chave não estiver disponível;
-- backend Cloudflare Workers Free + Workers KV Free, com Cron de dois em dois minutos, para processar pedidos depois de fechar o navegador;
-- primeiro e-mail por EmailJS na submissão; segundo por EmailJS com **link privado para PDF**, sem anexos pagos;
-- visual institucional (símbolo, favicon, logótipo do cabeçalho, avatar do Gmail e logótipo para o template do EmailJS);
-- validação frontend/backend, privacidade com consentimento, controlo de frequência simples, token de acesso ao PDF, TTL de 7 dias para os pedidos;
-- testes unitários e teste simulado do fluxo de dois e-mails, e workflow GitHub Actions para GitHub Pages.
-
-## Custo: sem pagamento para o projecto académico, com limites
-
-| Serviço | Modalidade usada | Atenção |
+| Membro | Número de estudante | Conta GitHub |
 |---|---|---|
-| Vue / Vite e PDF | Bibliotecas e código sem custo | Executa no computador/navegador |
-| API Banco Mundial | API pública | Depende de Internet |
-| GitHub Pages | Gratuito para repositório público | Necessita conta GitHub |
-| Cloudflare Worker | Free: 100.000 pedidos/dia | Limite de CPU por chamada (ver documentação) |
-| Workers KV | Free: 1.000 escritas/dia, 100.000 leituras/dia, 1.000 listagens/dia | Quotas; sem escalabilidade garantida |
-| EmailJS | Conta grátis com 200 pedidos/mês nesta conta | **Dois envios por plano ≈ 100 planos/mês**; anexos não incluídos |
-| Gemini API | Free tier **opcional** | Quotas e elegibilidade por região/conta; conteúdo pode ser usado para melhorar produtos |
+| Benjamim Junior | A confirmar | A confirmar |
+| Elmer Almirante | 7473 | A confirmar |
+| Mabikane Arnaldo | A confirmar | A confirmar |
 
-**Nunca active facturação nem faça upgrade.** Se o serviço de IA gratuito estiver indisponível, a aplicação usa o motor de regras; se o agendamento/e-mail externo não estiver configurado, a prévia e o PDF continuam a funcionar localmente. A modalidade sem custos não significa que todos os serviços de terceiros estejam disponíveis sem restrições em todas as contas.
+## Tecnologias
 
-Fontes oficiais: [Cloudflare Workers](https://developers.cloudflare.com/workers/platform/pricing/), [Cloudflare KV](https://developers.cloudflare.com/kv/platform/limits/), [Gemini API](https://ai.google.dev/gemini-api/docs/pricing), [EmailJS anexos](https://www.emailjs.com/docs/user-guide/file-attachments/).
+Vue 3, Composition API, Vue Router, Vite, JavaScript, CSS responsivo, API do Banco Mundial, Cloudflare Workers, Durable Objects com SQLite, alarmes e EmailJS. A interface e o BRD estão escritos em português.
 
-## Iniciar no Mac
+Os indicadores são obtidos através de `fetch` à API pública do Banco Mundial para Moçambique (`country/MOZ`):
+
+- `SL.UEM.1524.ZS` — desemprego juvenil total;
+- `SL.UEM.1524.FE.ZS` — mulheres;
+- `SL.UEM.1524.MA.ZS` — homens.
+
+A origem, o ano e a população representada são identificados junto dos gráficos. As séries representam estimativas da OIT para a força de trabalho dos 15 aos 24 anos e não previsões individuais.
+
+## Executar localmente
 
 ```bash
-cd "/Users/mabikane.arnaldo/Documents/KANE/KANE_WORKSPACE/2S_2026/PROG_WEB2/PRJ_FINAL/rumocerto-mz-final"
-npm install
+npm ci
 npm run dev
 ```
 
-Abrir o URL que o Vite indicar, tipicamente `http://localhost:5173/#/plano`.
-
-Sem backend configurado: seleccionar área, situação e objectivo, clicar **Prévia gratuita** e **Descarregar PDF**. A API do Banco Mundial também funciona sem o Worker.
-
-### Testes automatizados
+Testes automatizados e compilação:
 
 ```bash
-npm test     # 28 testes automatizados (frontend e backend, sem consumir APIs reais)
+npm test
 npm run build
-npm run preview
 ```
 
-## Activar os dois e-mails
+## Variáveis de ambiente
 
-1. Aproveitar o Gmail oficial já ligado ao EmailJS. O serviço conhecido do Grupo 8 é `service_v12e9ah`.
-2. Utilizar o template existente `template_veq29mm` para o **primeiro e-mail de confirmação**, adaptando o conteúdo para confirmar escolhas (não anexar PDF aqui).
-3. Utilizar o segundo template **`template_ktb1bxm`**, com `To Email: {{to_email}}`, `{{titulo_plano}}`, `{{resumo_plano}}`, `{{metodo}}` e `{{link_pdf}}`. Criar uma ligação no editor de conteúdo com texto «Descarregar o PDF» e URL `{{link_pdf}}`. **Não configurar Attachments**: EmailJS Free não permite anexos.
-4. Criar conta Cloudflare Free, uma namespace Workers KV e um Worker com agendamento cron a cada dois minutos (`*/2 * * * *`) para respeitar as 1.000 listagens/dia do KV gratuito. Configurar os segredos **no Worker** (`EMAILJS_PRIVATE_KEY`, `EMAILJS_PUBLIC_KEY`, `EMAILJS_SERVICE_ID`, IDs dos templates, `RATE_SALT` e `GEMINI_API_KEY` opcional). **Nunca** colocar a Private Key do EmailJS ou Gemini em `VITE_`.
-5. Fazer deploy do Worker, configurar o endereço público no frontend via `VITE_WORKER_URL`, testar o primeiro e segundo e-mails e depois publicar o frontend em GitHub Pages.
+No frontend, `VITE_WORKER_URL` aponta para o endereço HTTPS do Worker de produção. A publicação no GitHub Pages usa esta variável configurada em `Settings → Secrets and variables → Actions → Variables`.
 
-### Instruções completas passo a passo
+No Cloudflare Worker, as variáveis `EMAILJS_SERVICE_ID`, `EMAILJS_PUBLIC_KEY`, `EMAILJS_TEMPLATE_CONFIRM`, `EMAILJS_TEMPLATE_PLAN`, `EMAILJS_PRIVATE_KEY`, `PUBLIC_WORKER_URL`, `ALLOWED_ORIGINS`, `RATE_SALT` e `DOWNLOAD_SECRET` são configuradas no serviço. `DOWNLOAD_SECRET` deve ter pelo menos 24 caracteres aleatórios e não deve ser exposto. `GEMINI_API_KEY` é opcional; `GEMINI_MODEL` pode ser configurado como `gemini-3.5-flash-lite`. **As chaves privadas nunca devem ficar em ficheiros públicos, no frontend ou no histórico Git.** Os ficheiros `.env.example` e `backend/.dev.vars.example` indicam apenas nomes e parâmetros públicos.
 
-**[docs/INSTALAR_V2_FREE.md](docs/INSTALAR_V2_FREE.md)** — inclui comandos completos de Cloudflare, templates de e-mail, testes do cron e GitHub Pages.
-
-## Arquitectura
-
-```text
-Navegador → GitHub Pages (Vue.js)
-         ├─ API Banco Mundial (indicadores)
-         ├─ Prévia e PDF local gratuito
-         └─ POST /api/planos → Cloudflare Worker (segredos protegidos)
-                                 ├─ Gemini API gratuita (opcional)
-                                 │   ou motor educativo gratuito de regras
-                                 ├─ EmailJS: e-mail #1 imediato
-                                 ├─ Workers KV: pedido por 7 dias
-                                 └─ Cron (a cada 2 minutos) → EmailJS: e-mail #2
-                                                      + link privado para gerar PDF
-```
-
-## Segurança e integridade académica
-
-- Não solicitar documentos de identificação, passwords, contactos de terceiros, nem informação médica íntima.
-- Os campos do formulário ficam no `localStorage` do navegador excepto o e-mail, que só é enviado com consentimento; no modo com dois e-mails, os dados ficam no KV até 7 dias. A opção Gemini pode transferir textos introduzidos para um fornecedor externo. Ler termos de privacidade antes de activar.
-- A IA e os planos não são prova de oportunidades de emprego, nem garantem resultados. Estatísticas do Banco Mundial são indicadores nacionais e históricos.
-- O fluxo de fila com KV e Cron é apropriado para demonstração académica de baixa utilização; sob falhas de rede complexas podem ocorrer atrasos ou duplicações. Para operação real em escala, é necessário um sistema de filas com idempotência transaccional e protecção anti-spam robusta.
-- O repositório público deve conter informação sobre uso de IA e contribuições do Grupo 8.
-- As contas GitHub e os commits de Benjamim Junior, Elmer Almirante e Mabikane Arnaldo têm de ser realizados pelos próprios, com PR revisto por outro membro; este ZIP não substitui o histórico exigido na avaliação.
-- O BRD na pasta `docs/` é um documento **a completar** (links reais, números de estudante e amostra). Não inventar provas nem resultados de questionários.
+O EmailJS disponibiliza dois modelos: confirmação de pedido e entrega de ligação privada para PDF. A mensagem final é processada por um alarme de Durable Object cerca de cinco minutos depois, e não inclui anexo. A interface consulta o estado de configuração do serviço e informa quando o envio não está disponível, sem impedir o PDF local. Um estado «incerto» não é reenviado automaticamente; o utilizador é informado de que deve confirmar a recepção. O gerador PDF usa uma fonte TrueType Unicode incorporada directamente no PDF, obtida por HTTPS do projecto DejaVu alojado no repositório Prawn. Preserva acentos, o euro, marcas de conclusão e os caracteres cobertos pela fonte. A fonte não é incluída separadamente neste repositório. Quando não é possível obter a fonte, o sistema mantém a geração em modo de compatibilidade WinAnsi e identifica os caracteres não suportados por `[U+XXXX]`. Alguns pictogramas e alfabetos não cobertos pela fonte também usam esta representação. O pedido da fonte não transmite dados do utilizador.
 
 ## Estrutura
 
-```text
-backend/
-  src/{worker,planner,pdf,logo}.js   # API, motor de IA opcional, PDF de marca
-  tests/                            # simulação dos dois envios
-  wrangler.toml                      # cron + KV
-  .dev.vars.example                 # nomes dos segredos, sem valores reais
-src/
-  views/PlanoView.vue               # novo formulário + prévia + PDF + estado
-  components/, router/, composables/, data/, assets/
-public/branding/                   # identidade visual já integrada
-.github/workflows/deploy.yml       # GitHub Pages
-.env.example                       # apenas variáveis públicas do frontend
-docs/INSTALAR_V2_FREE.md           # passos para Mac e deploy
-```
+`src/` inclui páginas Vue, componentes e composables; `shared/` contém as regras de plano, indicadores e PDF; `backend/` contém o Worker e a configuração dos Durable Objects; `tests/` contém testes automatizados.
 
-## Links públicos (verificar antes da entrega)
+## Segurança e privacidade
 
-- Repositório: https://github.com/K6N9/rumocerto-mz
-- Site: https://k6n9.github.io/rumocerto-mz/
-- API Worker: https://rumocerto-mz-api.k3n4.workers.dev/api/saude
+O utilizador autoriza expressamente os e-mails. Os dados do perfil, o plano e o progresso são guardados no navegador, excepto os dados enviados ao Worker quando se pede o envio. Pedidos externos são armazenados temporariamente em Durable Objects durante até sete dias. O acesso ao PDF utiliza uma assinatura HMAC e o estado do pedido é protegido por um token. A opção de personalização com Gemini é voluntária e identificada no formulário. A plataforma não recolhe números de documento nem promete oportunidades de emprego.
 
-## Transparência do apoio de IA
+O sistema inclui validação no frontend e no Worker, limitação de pedidos por IP e e-mail com libertação coordenada de reservas rejeitadas, protecção CORS e verificação de compatibilidade entre frontend e backend. A submissão utiliza um identificador persistente, evitando novos e-mails ao repetir um pedido já registado. O segundo e-mail só é tentado uma vez por pedido; em caso de resposta incerta do fornecedor, a entrega pode falhar sem repetição automática. Os alarmes recuperam pedidos interrompidos antes da confirmação e eliminam os registos após o prazo de retenção. Os testes automatizados simulam o fornecedor de e-mail; a recepção efectiva das duas mensagens deve ser verificada em produção antes da defesa. A publicação e a existência de contribuições individuais também devem ser confirmadas no GitHub.
 
-ChatGPT foi utilizado como ferramenta de apoio para estudo dos requisitos, implementação inicial, validações, documentação e arquitectura. Gemini API é um gerador **opcional** do plano profissional, activado apenas pela equipa se existir chave gratuita; o conteúdo deve ser revisto e compreendido pelos estudantes. Nenhum texto produzido por IA deve ser apresentado como entrevista, vaga confirmada ou dado estatístico de fonte oficial.
+## Fontes
 
-## Correcções v2.1
+- Afrobarometer, comunicado de 23 de Junho de 2026: https://www.afrobarometer.org/articles/os-jovens-mocambicanos-enfrentam-dificuldades-para-encontrar-emprego-afirmando-que-sao-prejudicados-pela-falta-de-formacao-e-de-experiencia-profissional/
+- Banco Mundial, indicador de desemprego juvenil para Moçambique: https://data.worldbank.org/indicator/SL.UEM.1524.ZS?locations=MOZ
+- Documentação da API do Banco Mundial: https://datahelpdesk.worldbank.org/knowledgebase/articles/889392
+- Vue: https://vuejs.org/
+- Cloudflare Workers: https://developers.cloudflare.com/workers/
+- EmailJS: https://www.emailjs.com/docs/
+- Gemini API, modelos disponíveis: https://ai.google.dev/gemini-api/docs/models
+- Fonte DejaVu Sans (TrueType): https://github.com/prawnpdf/prawn/blob/master/data/fonts/DejaVuSans.ttf
 
-- **EmailJS Free:** segundo e-mail envia a ligação privada `link_pdf`, e não tenta anexos pagos; o PDF é gerado ao aceder ao Worker.
-- **KV Free:** `*/2 * * * *` evita 1.440 listagens/dia do cron de minuto a minuto (quota de 1.000/dia). Prazo estimado após o pedido: 5–7 minutos, não exacto.
-- **Testes:** validam os parâmetros reais `titulo_plano`, `resumo_plano`, `metodo`, `link_pdf`, rejeitam anexo e confirmam geração de plano orientado para Vue.js.
-- **Produção:** actualizar `PUBLIC_WORKER_URL` para o URL HTTPS público antes de enviar pedidos; os links `localhost` são exclusivos do Mac.
-- **Segurança:** regenerar a chave privada EmailJS anteriormente exposta; nunca enviar `.dev.vars` ao GitHub. Free Tier da IA poderá ter restrições de dados; evitar dados pessoais identificáveis nos pedidos Gemini.
+## Colaboração e integridade académica
 
-O registo `201 Created` e o estado `enviado` representam aceitação pelo serviço de correio, **não prova de entrega na caixa de entrada**. O Gmail do destinatário deve ser verificado.
+O trabalho deve ser original e explicado pelos seus autores. Cada membro deve utilizar a sua própria conta GitHub, criar um branch e submeter um commit por pull request revisto por outro membro. Os registos desses contributos não podem ser simulados.
+
+A equipa utilizou ChatGPT como apoio à estruturação, revisão e desenvolvimento do protótipo. Gemini é uma funcionalidade opcional da aplicação, não uma fonte dos indicadores oficiais. A equipa é responsável por validar o código, as fontes e todos os resultados apresentados.

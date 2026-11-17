@@ -1,6 +1,32 @@
 <template>
-  <div class="container inner-page"><div class="page-heading"><span class="eyebrow section-kicker">TRANSPARÊNCIA E PROPÓSITO</span><h1>Sobre o RumoCerto MZ</h1><p>Uma aplicação académica criada pelo Grupo 8 de Programação Web II do ISUTC, em 2026.</p></div>
-    <div class="about-layout"><section class="prose-card"><h2>O problema que abordamos</h2><p>A transição da formação para o mercado de trabalho exige acesso a informação compreensível e preparação profissional. O RumoCerto apresenta indicadores públicos e transforma boas práticas de preparação em pequenas acções pessoais.</p><p>Não divulgamos vagas nem garantimos emprego. A aplicação tem finalidade educativa.</p><h2>De onde vêm os dados?</h2><p>A aplicação consulta directamente a <a href="https://api.worldbank.org/v2/country/MOZ/indicator/SL.UEM.1524.ZS?format=json" target="_blank" rel="noopener noreferrer">API de Indicadores do Banco Mundial</a> com o país MOZ. São séries anuais modeladas pela Organização Internacional do Trabalho (OIT), relativas à força de trabalho entre 15 e 24 anos. O período disponível depende da publicação.</p><p>Os resultados da futura amostra de estudantes são <strong>dados de investigação separados</strong>, não substituem a API e não se devem generalizar automaticamente a todos os jovens moçambicanos.</p><h2>Privacidade</h2><p>Os campos do formulário ficam neste navegador através de <code>localStorage</code>, excepto o endereço de e-mail. Quando solicitas os dois envios, o e-mail e as escolhas são guardados temporariamente no Cloudflare KV por até sete dias, com uma ligação protegida por token para descarregar o PDF. O EmailJS processa os envios. A geração de IA Gemini é opcional e, na camada gratuita, o fornecedor pode utilizar as entradas para melhorar os seus produtos; sem chave de IA, é usado um motor educativo de regras. Não insiras dados médicos, financeiros ou íntimos; não submetas e-mails de terceiros sem consentimento.</p><h2>Limitações</h2><p>Os indicadores são nacionais, históricos e estimados. Não representam oportunidades de emprego actuais, nem prevêem resultados individuais. Sem Internet, a consulta à API poderá não funcionar. O envio de dois e-mails depende da configuração do Worker, KV, EmailJS e cron; a entrega de cinco minutos é aproximada e sujeita a limites gratuitos. O plano é educativo e não substitui orientação profissional individual.</p></section>
-    <aside class="about-aside"><span class="eyebrow">PROJECTO FINAL</span><h3>Grupo 8 · LECC31</h3><p>Benjamim Junior</p><p>Elmer Almirante</p><p>Mabikane Arnaldo</p><hr/><strong>Fontes</strong><a href="https://data.worldbank.org/indicator/SL.UEM.1524.ZS?locations=MZ" target="_blank" rel="noopener noreferrer">Banco Mundial · Desemprego juvenil</a><a href="https://datahelpdesk.worldbank.org/knowledgebase/articles/889392" target="_blank" rel="noopener noreferrer">Banco Mundial · API</a><a href="https://www.ilo.org/" target="_blank" rel="noopener noreferrer">OIT</a><hr/><strong>Metodologia</strong><p>Fonte dos indicadores: CC BY 4.0; atribuição junto aos gráficos e rodapé.</p></aside></div>
+  <div class="container inner-page">
+    <div class="page-heading">
+      <span class="eyebrow">SOBRE O PROJECTO</span>
+      <h1>Sobre a plataforma</h1>
+      <p>O RumoCerto MZ disponibiliza planos de preparação profissional e indicadores estatísticos de Moçambique. Não é uma plataforma de recrutamento.</p>
+    </div>
+    <div class="about-grid">
+      <div class="surface prose">
+        <h2>Finalidade</h2>
+        <p>A plataforma apresenta indicadores de desemprego juvenil e permite elaborar planos de desenvolvimento profissional com actividades organizadas em quatro semanas. O documento pode ser descarregado em PDF.</p>
+        <h2>Funcionamento</h2>
+        <p>O motor de regras adapta as actividades à área, ao objectivo, ao tempo disponível e às condições de acesso à Internet. O uso de Gemini é opcional no envio de planos por e-mail, quando o serviço estiver configurado.</p>
+        <details class="info-disclosure"><summary>Fontes e interpretação dos dados <span aria-hidden="true">+</span></summary><div class="info-disclosure-content"><p>Os indicadores vêm da API de Indicadores do Banco Mundial para Moçambique (MOZ), com estimativas modeladas da Organização Internacional do Trabalho. Referem-se à força de trabalho dos 15 aos 24 anos e são valores nacionais e históricos. Não descrevem vagas nem permitem prever a situação de uma pessoa.</p></div></details>
+        <details class="info-disclosure"><summary>Privacidade e utilização dos dados <span aria-hidden="true">+</span></summary><div class="info-disclosure-content"><p>O perfil e o progresso são guardados no navegador. O endereço de e-mail não é armazenado localmente. Quando é solicitado o envio, o servidor Cloudflare pode guardar temporariamente o endereço e as preferências durante até sete dias. As mensagens são processadas pelo EmailJS, e o acesso ao PDF utiliza uma ligação privada.</p><p>O botão para limpar os dados remove apenas o conteúdo deste navegador, não pedidos já enviados ao servidor. Se a personalização com Gemini estiver activada, determinados campos poderão ser enviados à Google, conforme indicado no formulário.</p></div></details>
+        <details class="info-disclosure"><summary>Limitações do serviço <span aria-hidden="true">+</span></summary><div class="info-disclosure-content"><p>O serviço depende de Internet, da disponibilidade das APIs e de quotas gratuitas. O envio de e-mails pode sofrer atrasos. Uma resposta de aceitação pelo serviço de correio não confirma a chegada à caixa de entrada. O plano não substitui orientação profissional especializada nem garante emprego.</p></div></details>
+      </div>
+      <aside class="about-aside">
+        <span class="eyebrow">PROJECTO ACADÉMICO</span>
+        <h3>Grupo 8 · LECC31</h3>
+        <p>Benjamim Junior</p><p>Elmer Almirante</p><p>Mabikane Arnaldo</p>
+        <hr />
+        <h3>Fontes</h3>
+        <a href="https://data.worldbank.org/indicator/SL.UEM.1524.ZS?locations=MZ" target="_blank" rel="noopener noreferrer">Banco Mundial / OIT ↗</a>
+        <a href="https://datahelpdesk.worldbank.org/knowledgebase/articles/889392" target="_blank" rel="noopener noreferrer">Documentação da API ↗</a>
+        <a href="https://www.afrobarometer.org/" target="_blank" rel="noopener noreferrer">Afrobarometer ↗</a>
+        <hr />
+        <p>Programação Web II · ISUTC · 2026</p>
+      </aside>
+    </div>
   </div>
 </template>

@@ -1,69 +1,39 @@
 import { ref, onMounted, onUnmounted, watch, toValue } from 'vue'
-import { normalizarSerieBancoMundial } from '../utils/formatacao.js'
-
-const DURACAO_CACHE_MS = 60 * 60 * 1000
-const cacheMemoria = new Map()
-
-function lerCache(codigo) {
-  const item = cacheMemoria.get(codigo)
-  if (item && Date.now() - item.dataHora < DURACAO_CACHE_MS) return item
-  try {
-    const texto = sessionStorage.getItem(`rumocerto:bm:${codigo}`)
-    const lido = texto ? JSON.parse(texto) : null
-    if (lido && Array.isArray(lido.serie) && Date.now() - lido.dataHora < DURACAO_CACHE_MS) return lido
-  } catch { /* Não bloquear se o armazenamento estiver indisponível. */ }
-  return null
-}
-
-function escreverCache(codigo, valor) {
-  cacheMemoria.set(codigo, valor)
-  try { sessionStorage.setItem(`rumocerto:bm:${codigo}`, JSON.stringify(valor)) } catch { /* opcional */ }
-}
-
+import { normalizarSerieBancoMundial } from '../../shared/indicadores.js'
+const cache = new Map()
+const TTL = 60*60*1000
 export function useIndicador(codigo) {
-  const serie = ref([])
-  const carregando = ref(true)
-  const erro = ref('')
-  const ultimaConsulta = ref('')
-  let controller = null
-
-  async function carregar(forcar = false) {
-    const id = toValue(codigo)
-    if (!id) { serie.value = []; carregando.value = false; erro.value = 'Indicador desconhecido.'; return }
-    if (controller) controller.abort()
-    controller = new AbortController()
-    const atual = controller
-    erro.value = ''
-    carregando.value = true
+  const serie=ref([]),carregando=ref(true),erro=ref(''),aviso=ref(''),consultaEm=ref('')
+  let controller=null
+  async function carregar(forcar=false) {
+    const id=toValue(codigo)
+    if(controller)controller.abort()
+    controller=new AbortController();const atual=controller
+    erro.value='';aviso.value='';carregando.value=true
+    if(!id) {serie.value=[];erro.value='Indicador inexistente.';carregando.value=false;return}
     try {
-      if (!forcar) {
-        const cache = lerCache(id)
-        if (cache) {
-          serie.value = cache.serie
-          ultimaConsulta.value = cache.consultadoEm
-          return
-        }
-      }
-      const endpoint = new URL(`https://api.worldbank.org/v2/country/MOZ/indicator/${encodeURIComponent(id)}`)
-      endpoint.searchParams.set('format', 'json')
-      endpoint.searchParams.set('per_page', '100')
-      const resposta = await fetch(endpoint, { signal: atual.signal, headers: { Accept: 'application/json' } })
-      if (!resposta.ok) throw new Error(`O servidor devolveu HTTP ${resposta.status}.`)
-      const json = await resposta.json()
-      const valores = normalizarSerieBancoMundial(json)
-      if (atual.signal.aborted) return
-      serie.value = valores
-      ultimaConsulta.value = new Date().toISOString()
-      escreverCache(id, { serie: valores, dataHora: Date.now(), consultadoEm: ultimaConsulta.value })
-    } catch (falha) {
-      if (!atual.signal.aborted) { serie.value = []; erro.value = `Não foi possível obter os dados do Banco Mundial. ${falha.message}` }
-    } finally {
-      if (atual === controller) carregando.value = false
-    }
+      const chave=`rumocerto:indicador:${id}`
+      let guardado=cache.get(chave)
+      if(!guardado)try{guardado=JSON.parse(sessionStorage.getItem(chave)||'null')}catch{}
+      if(!forcar&&guardado&&Array.isArray(guardado.serie)&&Date.now()-guardado.em<TTL){serie.value=guardado.serie;consultaEm.value=guardado.consulta;return}
+      const url=new URL(`https://api.worldbank.org/v2/country/MOZ/indicator/${encodeURIComponent(id)}`)
+      url.searchParams.set('format','json');url.searchParams.set('per_page','100')
+      const response=await fetch(url,{signal:atual.signal,headers:{Accept:'application/json'}})
+      if(!response.ok)throw new Error(`HTTP ${response.status}`)
+      const dados=normalizarSerieBancoMundial(await response.json())
+      if(atual.signal.aborted)return
+      serie.value=dados;consultaEm.value=new Date().toISOString()
+      const item={serie:dados,em:Date.now(),consulta:consultaEm.value};cache.set(chave,item)
+      try{sessionStorage.setItem(chave,JSON.stringify(item))}catch{}
+    } catch(e) {if(!atual.signal.aborted){
+      const chave=`rumocerto:indicador:${id}`
+      let anterior=cache.get(chave)
+      if(!anterior)try{anterior=JSON.parse(sessionStorage.getItem(chave)||'null')}catch{}
+      if(Array.isArray(anterior?.serie)&&anterior.serie.length){serie.value=anterior.serie;consultaEm.value=anterior.consulta;aviso.value='A fonte não está disponível neste momento. São apresentados os últimos valores guardados neste dispositivo.'}
+      else{erro.value='Não foi possível obter os indicadores. Verifique a ligação à Internet e tente novamente.';serie.value=[]}
+    }}
+    finally{if(controller===atual)carregando.value=false}
   }
-
-  onMounted(() => carregar())
-  watch(() => toValue(codigo), () => carregar())
-  onUnmounted(() => controller?.abort())
-  return { serie, carregando, erro, ultimaConsulta, carregar }
+  onMounted(()=>carregar());watch(()=>toValue(codigo),()=>carregar());onUnmounted(()=>controller?.abort())
+  return {serie,carregando,erro,aviso,consultaEm,carregar}
 }

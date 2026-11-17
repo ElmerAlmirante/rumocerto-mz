@@ -1,4 +1,4 @@
-name: Verificar e publicar no GitHub Pages
+name: Publicacao do RumoCerto MZ
 on:
   push:
     branches: [main]
@@ -8,27 +8,24 @@ on:
 permissions:
   contents: read
 jobs:
-  testar:
+  verificar:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Instalar dependências
-        run: npm install --no-audit --no-fund
-      - name: Executar testes
-        run: npm test
-      - name: Compilar aplicação
-        run: npm run build
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
   publicar:
     if: github.event_name != 'pull_request'
-    needs: testar
+    needs: verificar
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
-      contents: read
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -37,9 +34,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --no-audit --no-fund
-      - name: Build com variáveis públicas
-        run: npm run build
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
         env:
           VITE_WORKER_URL: ${{ vars.VITE_WORKER_URL }}
       - uses: actions/configure-pages@v5

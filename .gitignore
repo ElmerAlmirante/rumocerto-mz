@@ -3,17 +3,10 @@ dist/
 .env
 .env.*
 !.env.example
-.DS_Store
-.vscode/
-coverage/
-
-# Segredos do Worker Cloudflare
 backend/.dev.vars
 backend/.env*
 !backend/.dev.vars.example
-
-# Cloudflare: estado local e bases simuladas
-**/.wrangler/
-# Temporários e cópias de segurança
+.wrangler/
 *.log
-*.bak
+.DS_Store
+coverage/

@@ -1,15 +1,17 @@
 <script setup>
-const simbolo = `${import.meta.env.BASE_URL}branding/simbolo.png`
+const logo = `${import.meta.env.BASE_URL}branding/simbolo.webp`
 </script>
+
 <template>
   <footer class="site-footer">
-    <div class="container footer-grid">
-      <div>
-        <div class="footer-identity"><img :src="simbolo" alt="" class="footer-icon" width="45" height="45"/><p class="footer-brand">Rumo<span>Certo</span> MZ</p></div>
-        <p>Um projecto académico sobre a transição dos jovens para o mundo profissional.</p>
-      </div>
-      <div><strong>Dados e transparência</strong><p>Indicadores nacionais de Moçambique, estimativas modeladas da OIT via Banco Mundial. Não divulgamos vagas de emprego.</p><a href="https://data.worldbank.org/indicator/SL.UEM.1524.ZS?locations=MZ" target="_blank" rel="noopener noreferrer">Ver fonte dos indicadores ↗</a></div>
-      <div><strong>Projecto académico</strong><p>Grupo 8 · Programação Web II · ISUTC · 2026</p><RouterLink to="/sobre">Metodologia e privacidade</RouterLink></div>
+    <div class="container footer-layout">
+      <div><div class="footer-brandline"><img :src="logo" alt="" width="41" height="41" /><strong>RumoCerto <span>MZ</span></strong></div><p>Plataforma de orientação e desenvolvimento profissional. Projecto académico do Grupo 8.</p></div>
+      <nav aria-label="Ligações do rodapé">
+        <RouterLink to="/sobre">Sobre e privacidade</RouterLink>
+        <RouterLink to="/indicadores">Indicadores</RouterLink>
+        <a href="https://data.worldbank.org/indicator/SL.UEM.1524.ZS?locations=MZ" target="_blank" rel="noopener noreferrer">Fonte dos dados</a>
+      </nav>
     </div>
+    <div class="container footer-bottom"><span>Grupo 8 · LECC31 · ISUTC · 2026</span><span>O plano é educativo e não garante emprego.</span></div>
   </footer>
 </template>

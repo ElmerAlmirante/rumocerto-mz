@@ -1,0 +1,83 @@
+@media (max-width: 1020px) {
+  .hero-layout { gap: 36px; }
+  .hero h1 { font-size: 53px; }
+  .context-section { gap: 34px; }
+  .wizard-layout { grid-template-columns: 1.2fr .8fr; }
+  .plan-result-head { flex-direction: column; }
+  .week-overview { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 830px) {
+  .navbar { min-height: 70px; }
+  .menu-button { display: block; }
+  .nav-links { display: none; position: absolute; top: 70px; left: 0; right: 0; background: #fff; box-shadow: 0 15px 28px rgba(16,48,71,.12); padding: 12px 24px 24px; flex-direction: column; align-items: stretch; }
+  .nav-links.nav-open { display: flex; }
+  .nav-links > a { min-height: 45px; display: flex; align-items: center; }
+  .nav-links > a.nav-primary { margin: 10px 0 0; justify-content: center; }
+  .hero-layout { grid-template-columns: 1fr; gap: 0; }
+  .hero-content { padding: 65px 0 32px; }
+  .hero-visual { padding: 3px 0 65px; }
+  .hero h1 { max-width: 700px; }
+  .context-section { grid-template-columns: 1fr; }
+  .context-section .metric-card { max-width: 480px; width: 100%; }
+  .metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .wizard-layout { grid-template-columns: 1fr; }
+  .wizard-side { display: none; }
+  .about-grid { grid-template-columns: 1fr; }
+  .footer-layout { grid-template-columns: 1fr; gap: 20px; }
+  .footer-layout nav { justify-content: start; }
+}
+@media (max-width: 610px) {
+  .container { width: calc(100% - 32px); }
+  .brand { font-size: 20px; }
+  .brand-mark { width: 40px; height: 40px; }
+  .hero-content { padding: 59px 0 29px; }
+  .hero h1 { font-size: clamp(38px,10vw,51px); }
+  .hero-content > p:not(.hero-assurance) { font-size: 15px; }
+  .hero-buttons { flex-direction: column; align-items: stretch; }
+  .hero-visual { padding: 6px 6px 55px; }
+  .preview-card { padding: 23px; box-shadow: 10px 14px 0 rgba(4,23,35,.13); }
+  .section { padding: 62px 0; }
+  .section-heading { flex-direction: column; align-items: start; }
+  .metric-grid, .journey-grid, .stat-strip { grid-template-columns: 1fr; }
+  .inner-page { padding-top: 44px; padding-bottom: 70px; }
+  .page-heading h1 { font-size: clamp(32px,8vw,42px); }
+  .page-heading p { font-size: 14px; }
+  .wizard-card, .surface, .plan-result { padding: 21px; }
+  .stepper { gap: 4px; }
+  .stepper-item { gap: 5px; }
+  .stepper-item > span { width: 26px; height: 26px; }
+  .stepper-item strong { font-size: 11px; }
+  .field-grid { grid-template-columns: 1fr; gap: 0; }
+  .wizard-actions .btn { flex: 1; min-width: 0; }
+  .final-actions { align-items: start; flex-direction: column; }
+  .plan-result-head h2 { font-size: 22px; }
+  .plan-result-actions { width: 100%; }
+  .plan-result-actions .btn { width: 100%; }
+  .week-overview { grid-template-columns: 1fr 1fr; }
+  .progress-summary { padding: 23px; }
+  .progress-actions { align-items: start; flex-direction: column; }
+  .week-summary { gap: 10px; padding: 16px 13px; }
+  .week-index { width: 35px; height: 35px; }
+  .week-heading strong { font-size: 13px; }
+  .week-heading small { font-size: 11px; }
+  .week-count { font-size: 11px; padding: 5px 7px; }
+  .week-content { padding: 0 15px 20px; }
+  .chart-section .section-heading { align-items: start; }
+  .footer-layout nav { grid-template-columns: 1fr; }
+  .footer-bottom { flex-direction: column; }
+}
+@media (max-width: 390px) {
+  .brand { font-size: 18px; }
+  .stepper-item strong { font-size: 10px; }
+  .week-overview { grid-template-columns: 1fr; }
+  .progress-figure strong { font-size: 35px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+.prose .info-disclosure { margin-top: 14px; box-shadow: none; }
+.prose .info-disclosure summary { padding: 17px 19px; }
+.prose .info-disclosure-content { padding: 0 19px 18px; }
+.detail-source { margin-top: 24px; }
+.detail-source code { background: #e8f4f0; border-radius: 5px; padding: 2px 5px; }
+.detail-source .text-link { margin-top: 8px; }

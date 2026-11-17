@@ -1,31 +1,32 @@
-import { computed, reactive, ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { calcularProgresso } from '../../shared/planner.js'
+import { assinaturaPerfil, substituirPlano } from '../../shared/estado.js'
+import { estadoInicial, normalizarEstadoSalvo } from '../../shared/persistencia.js'
 
-const CHAVE = 'rumocerto:plano:v1'
-const inicial = () => ({ area: '', situacao: '', objetivo: '', recursoId: 'cv', notas: '', concluido: [], disponibilidade: '3 a 5 horas por semana', internet: 'Acesso limitado a dados móveis', competencias: '', dificuldade: '', nome: '', usarIA: false })
-
-function recuperar() {
-  try {
-    const texto = localStorage.getItem(CHAVE)
-    const salvo = texto ? JSON.parse(texto) : {}
-    return { ...inicial(), ...salvo, concluido: Array.isArray(salvo.concluido) ? salvo.concluido : [] }
-  } catch { return inicial() }
+const KEY = 'rumocerto:v3:estado'
+function ler() {
+  try { return normalizarEstadoSalvo(JSON.parse(localStorage.getItem(KEY) || 'null')) }
+  catch { return estadoInicial() }
 }
 
-export function usePlano() {
-  const plano = reactive(recuperar())
-  const foiGuardado = ref(false)
-  const totalConcluido = computed(() => plano.concluido.length)
-  watch(plano, () => {
-    try { localStorage.setItem(CHAVE, JSON.stringify(plano)); foiGuardado.value = true }
-    catch { foiGuardado.value = false }
-  }, { deep: true })
+const dados = ref(ler())
+watch(dados, valor => { try { localStorage.setItem(KEY, JSON.stringify(valor)) } catch {} }, { deep: true })
 
-  function alternarPasso(index) {
-    if (plano.concluido.includes(index)) plano.concluido = plano.concluido.filter((n) => n !== index)
-    else plano.concluido = [...plano.concluido, index]
+export function usePlano() {
+  const perfil = computed(() => dados.value.perfil)
+  const plano = computed(() => dados.value.plano)
+  const concluidas = computed(() => dados.value.concluidas)
+  const perfilDoPlano = computed(() => dados.value.perfilDoPlano)
+  const progresso = computed(() => calcularProgresso(dados.value.plano, dados.value.concluidas))
+  const desactualizado = computed(() => Boolean(dados.value.plano && dados.value.assinatura !== assinaturaPerfil(dados.value.perfil)))
+  function guardarPlano(novo) {
+    dados.value = substituirPlano(dados.value, novo, dados.value.perfil)
   }
-  function limpar() {
-    Object.assign(plano, inicial())
+  function alternarTarefa(chave) {
+    const actual = new Set(dados.value.concluidas)
+    actual.has(chave) ? actual.delete(chave) : actual.add(chave)
+    dados.value.concluidas = [...actual]
   }
-  return { plano, foiGuardado, totalConcluido, alternarPasso, limpar }
+  function limpar() { dados.value = estadoInicial() }
+  return { perfil, perfilDoPlano, plano, concluidas, progresso, desactualizado, guardarPlano, alternarTarefa, limpar }
 }

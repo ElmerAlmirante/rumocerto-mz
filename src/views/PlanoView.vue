@@ -1,144 +1,219 @@
 <script setup>
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { usePlano } from '../composables/usePlano.js'
-import { recursos } from '../data/recursos.js'
-import { AREAS, SITUACOES, DISPONIBILIDADES, INTERNET, validarPedido, construirPlanoBase } from '../../backend/src/planner.js'
-import { criarPDF } from '../../backend/src/pdf.js'
-
-const rota = useRoute()
-const { plano, foiGuardado, limpar } = usePlano()
-const email = ref('')
-const consentimento = ref(false)
-const website = ref('')
-const erros = ref({})
-const estado = ref('parado')
-const mensagem = ref('')
-const gerado = ref(null)
-const pedidoDoPDF = ref(null)
-const trabalho = ref(null)
-const token = ref('')
-const backend = String(import.meta.env.VITE_WORKER_URL || '').replace(/\/$/,'')
-let timer = null
-const areaRecurso = computed(() => recursos.find(r=>r.id===plano.recursoId) || recursos[0])
-const descricoesEstado = {pendente:'A preparar o envio', enviado:'Segundo e-mail enviado', falhou:'Falha no envio'}
-const estadoLegivel = computed(() => descricoesEstado[trabalho.value?.estado] || 'A processar')
-function tituloSemana(s) {
-  return String(s.titulo||'Actividades da semana')
-    .replace(/^\s*semana\s*0*[1-4]\s*[:\-–—|]\s*/i,'').trim() || 'Actividades da semana'
+import { AREAS, SITUACOES, DISPONIBILIDADES, INTERNET, validarPerfil, gerarPlano } from '../../shared/planner.js'
+import { gerarPdf, gerarPdfUnicode } from '../../shared/pdf.js'
+import { VERSAO_PROTOCOLO } from '../../shared/versao.js'
+const {perfil,perfilDoPlano,plano,desactualizado,guardarPlano,limpar}=usePlano()
+const passo=ref(1),email=ref(''),consentimento=ref(false),website=ref(''),erro=ref({}),mensagem=ref(''),estado=ref('parado'),pedido=ref(null),token=ref(''),planoRemoto=ref(null)
+const api=String(import.meta.env.VITE_WORKER_URL || '').replace(/\/$/,'')
+const situacaoServico=ref(api ? 'a_verificar' : 'indisponivel')
+const enviarDisponivel=computed(()=>situacaoServico.value==='disponivel')
+const descricaoServico=computed(()=>({a_verificar:'A verificar o serviço de e-mail…',disponivel:'Serviço de e-mail disponível',indisponivel:'Serviço de e-mail indisponível. O plano permanece disponível em PDF.'})[situacaoServico.value])
+const CHAVE_SUBMISSAO='rumocerto:submissao:v34'
+async function identificarSubmissao(dados){
+  const texto=JSON.stringify({nome:dados.nome,area:dados.area,situacao:dados.situacao,objetivo:dados.objetivo,disponibilidade:dados.disponibilidade,internet:dados.internet,competencias:dados.competencias,dificuldade:dados.dificuldade,usarIA:dados.usarIA,email:dados.email})
+  const bruto=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(texto))
+  const assinatura=[...new Uint8Array(bruto)].map(b=>b.toString(16).padStart(2,'0')).join('')
+  let existente=null
+  try{existente=JSON.parse(localStorage.getItem(CHAVE_SUBMISSAO)||'null')}catch{}
+  if(existente?.assinatura===assinatura && /^[0-9a-f-]{36}$/i.test(existente?.id||'') && Date.now()-existente.criadoEm<7*24*60*60*1000)return existente.id
+  const id=crypto.randomUUID()
+  try{localStorage.setItem(CHAVE_SUBMISSAO,JSON.stringify({id,assinatura,criadoEm:Date.now()}))}catch{}
+  return id
 }
-function tempoSemana(s) {
-  return (s.tarefas||[]).reduce((n,t)=>n+Number(String(t).match(/^\s*\((\d+)\s*min\)/i)?.[1]||0),0)
-}
-
-watch(()=>rota.query.recurso,id=>{if(recursos.some(r=>r.id===id))plano.recursoId=id},{immediate:true})
-function pedido(){return {
-  nome:plano.nome, email:email.value.trim(), area:plano.area, situacao:plano.situacao,
-  disponibilidade:plano.disponibilidade, internet:plano.internet, objetivo:plano.objetivo,
-  competencias:plano.competencias, dificuldade:plano.dificuldade, usarIA:plano.usarIA, consentimento:consentimento.value, website:website.value,
-}}
-async function verificar(){
-  erros.value=validarPedido(pedido())
-  const valido=Object.keys(erros.value).length===0
-  if(!valido){
-    await nextTick()
-    // Focar o primeiro campo assinalado, mantendo o fluxo do formulário.
-    const campo=Object.keys(erros.value)[0]
-    const mapa={area:'area',situacao:'situacao',objetivo:'objetivo',email:'email',consentimento:'consentimento'}
-    document.getElementById(mapa[campo]||campo)?.focus()
-  }
-  return valido
-}
-function criarPrevia(){
-  if(!plano.area || !plano.situacao || (plano.objetivo||'').trim().length<12){mensagem.value='Indica área, situação e objectivo (mínimo de 12 caracteres) para visualizar uma prévia.';return}
-  pedidoDoPDF.value={...pedido()}
-  gerado.value=construirPlanoBase(pedidoDoPDF.value)
-  mensagem.value='Prévia gratuita criada no navegador. Para receber os dois e-mails, preenche o e-mail, autoriza o envio e selecciona «Pedir o plano».'
-  estado.value='previa'
-}
-async function pedirPlano(){
-  mensagem.value=''
-  if(!(await verificar())){mensagem.value='Verifica os campos assinalados.';estado.value='erro';return}
-  if(!backend){mensagem.value='O backend de envios agendados ainda não foi configurado. Podes criar uma prévia local e descarregar o PDF.';estado.value='erro';return}
-  estado.value='enviando'
-  const dadosPedido={...pedido()}
+const passos = [{ numero: 1, titulo: 'Perfil' }, { numero: 2, titulo: 'Objectivo' }, { numero: 3, titulo: 'Plano' }]
+let timer=null
+const loading=computed(()=>estado.value==='enviando')
+const estadoLegivel=computed(()=>({por_confirmar:'Pedido a aguardar confirmação',a_confirmar:'A enviar a confirmação',pendente:'Confirmação aceite; entrega agendada',enviando:'A enviar a mensagem final',enviado:'Mensagem aceite pelo serviço de correio',falhou:'O serviço não concluiu o envio',incerto:'Resultado do envio por confirmar'})[pedido.value?.estado]||'Em processamento')
+async function consultarComPrazo(url, opcoes = {}, milissegundos = 15000) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), milissegundos)
   try {
-    const resposta=await fetch(backend+'/api/planos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dadosPedido)})
-    const conteudo=await resposta.json()
-    if(!resposta.ok){erros.value=conteudo.erros||{};throw new Error(conteudo.erro||'Não foi possível criar o plano.')}
-    gerado.value=conteudo.plano
-    pedidoDoPDF.value=dadosPedido
-    trabalho.value={id:conteudo.id,agendadoPara:conteudo.agendadoPara,estado:conteudo.estado,estadoIA:conteudo.estadoIA}
-    token.value=conteudo.token
-    estado.value='agendado'
-    mensagem.value='O EmailJS aceitou o primeiro e-mail. O plano completo será enviado por e-mail dentro de aproximadamente 5 a 7 minutos. Podes fechar o navegador.' + (plano.usarIA && conteudo.estadoIA!=='sucesso'?' O serviço de IA não estava disponível e foi utilizado o percurso educativo gratuito.':'')
-    email.value=''
-    if(timer)clearInterval(timer)
-    timer=setInterval(consultarEstado,30000)
-  }catch(e){estado.value='erro';mensagem.value=e.message}
+    return await fetch(url, { ...opcoes, signal: controller.signal })
+  } finally {
+    clearTimeout(timeout)
+  }
 }
-async function consultarEstado(){
-  if(!trabalho.value || !backend || !token.value)return
+function validarEtapa(n){
+  const e=validarPerfil(perfil.value)
+  const chaves=n===1?['area','situacao']:n===2?['objetivo','disponibilidade','internet','competencias','dificuldade']:[]
+  erro.value=Object.fromEntries(Object.entries(e).filter(([k])=>chaves.includes(k)))
+  return !Object.keys(erro.value).length
+}
+async function avancar(){if(!validarEtapa(passo.value)){await nextTick();document.querySelector('[aria-invalid="true"]')?.focus();return}passo.value=Math.min(3,passo.value+1);mensagem.value='';window.scrollTo({top:0,behavior:'smooth'})}
+function voltar(){passo.value=Math.max(1,passo.value-1);erro.value={};mensagem.value=''}
+function criarPrevia(){
+  const e=validarPerfil(perfil.value)
+  if(Object.keys(e).length){erro.value=e;passo.value=e.area||e.situacao?1:2;mensagem.value='Revise os campos assinalados antes de gerar o plano.';return}
+  try{const result=gerarPlano(perfil.value);guardarPlano(result);estado.value='previa';mensagem.value='Plano criado. Consulte as actividades ou descarregue o documento em PDF.';return true}
+  catch(ex){estado.value='erro';mensagem.value=ex.message;return false}
+}
+async function descarregar(){
+  if(!plano.value)return
+  let pdf
+  try { pdf=await gerarPdfUnicode(perfilDoPlano.value||perfil.value,plano.value) }
+  catch { pdf=gerarPdf(perfilDoPlano.value||perfil.value,plano.value); mensagem.value='O PDF foi gerado. Alguns símbolos podem ser apresentados em formato alternativo.' }
+  const url=URL.createObjectURL(new Blob([pdf],{type:'application/pdf'}))
+  const a=document.createElement('a')
+  a.href=url;a.download='RumoCerto_MZ_Plano_30_Dias.pdf';a.click()
+  setTimeout(()=>URL.revokeObjectURL(url),3000)
+}
+async function verificarServico(){
+  if (!api) { situacaoServico.value='indisponivel';return false }
+  situacaoServico.value='a_verificar'
+  try {
+    const r=await consultarComPrazo(api+'/api/saude',{},9000)
+    const servico=await r.json()
+    situacaoServico.value=r.ok && servico.ok && servico.envioDisponivel && servico.versao===VERSAO_PROTOCOLO ? 'disponivel' : 'indisponivel'
+  } catch { situacaoServico.value='indisponivel' }
+  return situacaoServico.value==='disponivel'
+}
+function mensagemEstadoEnvio(res){
+  if(res.estado==='incerto')return res.faseIncerta==='confirmacao' ?
+    'Não foi possível confirmar a aceitação da mensagem inicial. Verifique a caixa de entrada e a pasta de spam. O pedido não será reenviado automaticamente.' :
+    'Não foi possível confirmar a aceitação da mensagem final. Verifique a caixa de entrada e a pasta de spam antes de efectuar outro pedido.'
+  if(res.estado==='falhou')return 'O envio não foi concluído. O plano e o PDF continuam disponíveis neste dispositivo.'
+  if(res.estado==='enviado')return 'A mensagem foi aceite pelo serviço de e-mail. Confirme a recepção na caixa de entrada ou na pasta de spam.'
+  if(res.estado==='por_confirmar' || res.estado==='a_confirmar')return 'Pedido registado. A confirmação está em processamento. Não é necessário enviar novamente.'
+  return res.recuperado ? 'O pedido já se encontrava registado. Não foram geradas mensagens adicionais.' :
+    'A confirmação foi aceite pelo serviço de e-mail. A mensagem final está prevista para cerca de 5 a 7 minutos.'
+}
+async function pedirPorEmail(){
+  if(!await verificarServico()){mensagem.value=descricaoServico.value;estado.value='erro';return}
+  const dados={...perfil.value,email:email.value.trim(),consentimento:consentimento.value,website:website.value}
+  const e=validarPerfil(dados,{exigirEmail:true})
+  erro.value=e
+  if(Object.keys(e).length){
+    estado.value='erro'
+    mensagem.value='Revise os campos assinalados. O progresso guardado foi preservado.'
+    if(e.area||e.situacao)passo.value=1
+    else if(e.objetivo||e.disponibilidade||e.internet||e.competencias||e.dificuldade)passo.value=2
+    return
+  }
+  dados.submissaoId=await identificarSubmissao(dados)
+  estado.value='enviando';mensagem.value='A verificar a disponibilidade do serviço…'
   try{
-    const r=await fetch(`${backend}/api/planos/${trabalho.value.id}?token=${token.value}`)
+    mensagem.value='A enviar o pedido…'
+    const r=await consultarComPrazo(api+'/api/planos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dados)},30000)
+    const resposta=await r.json();if(!r.ok)throw new Error(resposta.erro||'Pedido não aceite pelo servidor')
+    if(!resposta.plano || !Array.isArray(resposta.plano.semanas) || resposta.plano.semanas.length!==4)throw new Error('A resposta do servidor contém um plano incompleto. O progresso guardado foi preservado.')
+    if (!plano.value) guardarPlano(resposta.plano)
+    else if (plano.value.diagnostico !== resposta.plano.diagnostico || plano.value.estrategia !== resposta.plano.estrategia || plano.value.metodo !== resposta.plano.metodo || JSON.stringify(plano.value.semanas.map(s=>s.tarefas)) !== JSON.stringify(resposta.plano.semanas.map(s=>s.tarefas))) planoRemoto.value=resposta.plano
+    pedido.value={id:resposta.id,agendadoPara:resposta.agendadoPara,estado:resposta.estado};token.value=resposta.token
+    guardarPedidoPendente()
+    estado.value=r.status===202?'enviando_confirmacao':resposta.estado==='enviado'?'concluido':['incerto','falhou'].includes(resposta.estado)?'erro':'agendado'
+    mensagem.value=mensagemEstadoEnvio(resposta)
+    if(timer)clearInterval(timer);if(!['enviado','incerto','falhou'].includes(resposta.estado)){timer=setInterval(actualizarEstado,30000)}
+  }catch(ex){estado.value='erro';mensagem.value=ex.name==='AbortError'?'O serviço não respondeu dentro do prazo. O plano permanece disponível neste dispositivo. Verifique o e-mail antes de repetir o pedido.':ex.message}
+}
+const CHAVE_PEDIDO='rumocerto:pedido:pendente'
+function guardarPedidoPendente(){
+  try { if(pedido.value?.id && token.value) sessionStorage.setItem(CHAVE_PEDIDO,JSON.stringify({pedido:pedido.value,token:token.value})) } catch {}
+}
+function removerPedidoPendente(){try{sessionStorage.removeItem(CHAVE_PEDIDO)}catch{}}
+async function actualizarEstado(){
+  if(!pedido.value?.id||!api||!token.value)return
+  try{
+    const r=await consultarComPrazo(`${api}/api/planos/${pedido.value.id}`,{headers:{Authorization:`Bearer ${token.value}`}},12000)
+    if(r.status===404||r.status===401){clearInterval(timer);removerPedidoPendente();pedido.value=null;token.value='';mensagem.value='O pedido anterior expirou. O plano permanece disponível neste navegador.';return}
     if(!r.ok)return
-    const dados=await r.json()
-    trabalho.value.estado=dados.estado
-    if(dados.estado==='enviado'){estado.value='concluido';mensagem.value='O EmailJS aceitou o segundo envio. Confirma a recepção na caixa de entrada ou no spam.';clearInterval(timer)}
-    if(dados.estado==='falhou'){estado.value='erro';mensagem.value='O envio final falhou após as tentativas. O PDF continua disponível nesta página.';clearInterval(timer)}
-  }catch{/* Indicador de estado facultativo; o envio continua no servidor. */}
+    const res=await r.json()
+    pedido.value.estado=res.estado
+    pedido.value.faseIncerta=res.faseIncerta
+    guardarPedidoPendente()
+    if(['enviado','falhou','incerto'].includes(res.estado)){
+      clearInterval(timer)
+      if(res.estado!=='incerto')removerPedidoPendente()
+      estado.value=res.estado==='enviado'?'concluido':'erro'
+      mensagem.value=mensagemEstadoEnvio(res)
+    }
+  }catch{}
 }
-function limparTudo(){
-  limpar();email.value='';consentimento.value=false;website.value='';erros.value={};gerado.value=null;pedidoDoPDF.value=null;trabalho.value=null;token.value='';estado.value='parado';mensagem.value='';if(timer)clearInterval(timer)
+function adoptarPlanoRemoto(){
+  if(!planoRemoto.value)return
+  const confirmar= !plano.value || window.confirm('Deseja substituir o plano actual pela versão recebida por e-mail? Se as actividades forem diferentes, o progresso será reiniciado.')
+  if(!confirmar)return
+  guardarPlano(planoRemoto.value)
+  planoRemoto.value=null
+  mensagem.value='O plano recebido por e-mail está disponível para acompanhamento.'
 }
-function descarregar(){
-  if(!gerado.value)return
-  const bytes=criarPDF(pedidoDoPDF.value||plano,gerado.value)
-  const blob=new Blob([bytes],{type:'application/pdf'})
-  const href=URL.createObjectURL(blob)
-  const a=document.createElement('a');a.href=href;a.download='RumoCerto_MZ_Plano_30_Dias.pdf';a.click()
-  setTimeout(()=>URL.revokeObjectURL(href),30000)
+function apagarLocal(){
+  if(window.confirm('Eliminar o perfil, o plano e o progresso guardados neste dispositivo? Pedidos já enviados ao servidor não são eliminados.')){
+    limpar();passo.value=1;email.value='';consentimento.value=false;website.value='';erro.value={};mensagem.value='Dados deste dispositivo eliminados.';estado.value='parado';pedido.value=null;token.value='';planoRemoto.value=null;removerPedidoPendente();try{localStorage.removeItem(CHAVE_SUBMISSAO)}catch{}clearInterval(timer)
+  }
 }
-onUnmounted(()=>{if(timer)clearInterval(timer)})
+onMounted(()=>{
+  verificarServico()
+  try{
+    const salvo=JSON.parse(sessionStorage.getItem(CHAVE_PEDIDO)||'null')
+    if(salvo?.pedido?.id && /^[0-9a-f]{48}$/.test(salvo?.token||'')){
+      pedido.value=salvo.pedido;token.value=salvo.token
+      passo.value=3;actualizarEstado()
+      timer=setInterval(actualizarEstado,30000)
+    }
+  }catch{}
+})
+onUnmounted(()=>clearInterval(timer))
 </script>
+
 <template>
-  <div class="container inner-page">
-    <div class="page-heading"><span class="eyebrow section-kicker">ORIENTAÇÃO PROFISSIONAL PERSONALIZADA</span><h1>O teu plano de carreira, à tua medida.</h1><p>Descreve a tua realidade. Recebe um primeiro e-mail de confirmação e, aproximadamente 5 a 7 minutos depois, uma ligação privada para descarregar o plano de 30 dias em PDF. A prévia local funciona mesmo sem serviços externos.</p></div>
-    <div class="plan-layout">
-      <section class="plan-form-card" aria-labelledby="dados-titulo">
-        <div class="card-heading"><div><span class="eyebrow">ETAPA 01</span><h2 id="dados-titulo">Conta-nos sobre ti</h2></div><span class="privacy-chip">Sem pagamento</span></div>
-        <form @submit.prevent="pedirPlano" novalidate>
-          <div class="field"><label for="nome">Nome ou forma de tratamento (opcional)</label><input id="nome" v-model.trim="plano.nome" maxlength="90" placeholder="Como gostarias de ser tratado(a)?"/></div>
-          <div class="field-grid">
-            <div class="field"><label for="area">Área profissional *</label><select id="area" v-model="plano.area" :aria-invalid="Boolean(erros.area)"><option value="">Escolhe uma área</option><option v-for="a in AREAS" :key="a">{{ a }}</option></select><small class="field-error" v-if="erros.area">{{ erros.area }}</small></div>
-            <div class="field"><label for="situacao">Situação actual *</label><select id="situacao" v-model="plano.situacao" :aria-invalid="Boolean(erros.situacao)"><option value="">Escolhe uma situação</option><option v-for="s in SITUACOES" :key="s">{{ s }}</option></select><small class="field-error" v-if="erros.situacao">{{ erros.situacao }}</small></div>
+  <div class="container inner-page plan-page">
+    <div class="page-heading plan-heading">
+      <span class="eyebrow">DESENVOLVIMENTO PROFISSIONAL</span>
+      <h1>Plano de desenvolvimento personalizado</h1>
+      <p>Organize um objectivo profissional em quatro semanas de actividades, através de três etapas.</p>
+    </div>
+
+    <div class="wizard-layout">
+      <section class="wizard-card" aria-labelledby="formulario-titulo">
+        <div class="stepper" aria-label="Etapas da criação">
+          <div v-for="s in passos" :key="s.numero" class="stepper-item" :class="{ 'step-current': passo === s.numero, 'step-complete': passo > s.numero }" :aria-current="passo === s.numero ? 'step' : undefined">
+            <span>{{ passo > s.numero ? '✓' : s.numero }}</span><strong>{{ s.titulo }}</strong>
           </div>
-          <div class="field"><label for="objetivo">Principal objectivo para os próximos 30 dias *</label><textarea id="objetivo" v-model.trim="plano.objetivo" maxlength="450" rows="3" placeholder="Ex.: montar um portefólio e preparar-me para entrevistas de estágio." :aria-invalid="Boolean(erros.objetivo)"/><small class="field-error" v-if="erros.objetivo">{{ erros.objetivo }}</small></div>
-          <div class="field-grid">
-            <div class="field"><label for="tempo">Tempo que tens por semana *</label><select id="tempo" v-model="plano.disponibilidade"><option v-for="op in DISPONIBILIDADES" :key="op">{{ op }}</option></select></div>
-            <div class="field"><label for="acesso">Como acedes à Internet? *</label><select id="acesso" v-model="plano.internet"><option v-for="op in INTERNET" :key="op">{{ op }}</option></select></div>
+        </div>
+
+        <form @submit.prevent="pedirPorEmail" novalidate>
+          <div v-if="passo === 1">
+            <div class="form-heading"><span class="eyebrow">PASSO 01 · PERFIL</span><h2 id="formulario-titulo">Informações do perfil</h2><p>Indique a área profissional e a situação actual.</p></div>
+            <div class="field"><label for="nome">Nome de preferência <span>(opcional)</span></label><input id="nome" v-model.trim="perfil.nome" maxlength="90" autocomplete="off" placeholder="Ex.: Ana" /></div>
+            <div class="field"><label for="area">Área profissional *</label><select id="area" v-model="perfil.area" :aria-invalid="Boolean(erro.area)"><option value="">Seleccione uma área</option><option v-for="a in AREAS" :key="a">{{ a }}</option></select><small v-if="erro.area" class="error-text">{{ erro.area }}</small></div>
+            <div class="field"><label for="situacao">Situação actual *</label><select id="situacao" v-model="perfil.situacao" :aria-invalid="Boolean(erro.situacao)"><option value="">Seleccione a situação actual</option><option v-for="s in SITUACOES" :key="s">{{ s }}</option></select><small v-if="erro.situacao" class="error-text">{{ erro.situacao }}</small></div>
+            <button type="button" class="btn btn-primary full-button" @click="avancar">Continuar <span aria-hidden="true">↗</span></button>
           </div>
-          <div class="field"><label for="competencias">O que já sabes fazer? (opcional)</label><textarea id="competencias" v-model.trim="plano.competencias" maxlength="300" rows="2" placeholder="Ex.: JavaScript básico, trabalhar em equipa, Word..."/></div>
-          <div class="field"><label for="dificuldade">Qual é a maior dificuldade que enfrentas? (opcional)</label><textarea id="dificuldade" v-model.trim="plano.dificuldade" maxlength="450" rows="2" placeholder="Ex.: tenho poucas horas livres e dados móveis limitados."/></div>
-          <div class="field"><label for="email">E-mail onde queres receber os dois envios *</label><input id="email" v-model.trim="email" type="email" autocomplete="email" placeholder="exemplo@email.com" :aria-invalid="Boolean(erros.email)"/><small class="field-error" v-if="erros.email">{{ erros.email }}</small></div>
-          <div class="field hidden-honeypot" aria-hidden="true"><label>Deixa este campo vazio<input v-model="website" tabindex="-1" autocomplete="off"/></label></div>
-          <label class="plan-ai-option"><input v-model="plano.usarIA" type="checkbox"/><span><strong>Usar IA Gemini para tentar personalizar ainda mais o meu plano (opcional)</strong><small>Se seleccionares, a área, objectivo, situação, competências e dificuldades serão enviados ao serviço Gemini da Google. Não enviamos o teu e-mail para a IA. Se o serviço não estiver disponível, recebes na mesma um plano criado pelas regras educativas gratuitas.</small></span></label>
-          <label class="plan-consent"><input id="consentimento" v-model="consentimento" type="checkbox" :aria-invalid="Boolean(erros.consentimento)"/><span>Autorizo o envio dos dois e-mails e o processamento dos dados que forneci pelo RumoCerto MZ e pelo serviço de e-mail. Sei que o plano é educativo e não garante emprego ou estágio.</span></label>
-          <small class="field-error" v-if="erros.consentimento">{{ erros.consentimento }}</small>
-          <div class="plan-submit-actions"><button class="btn btn-primary" type="submit" :disabled="estado==='enviando'">{{ estado==='enviando'?'A criar e a confirmar…':'Pedir o plano e os 2 e-mails ↗' }}</button><button class="btn btn-outline" type="button" @click="criarPrevia">Prévia gratuita</button><button type="button" class="link-button danger-link" @click="limparTudo">Limpar dados</button></div>
-          <p class="data-note">{{foiGuardado?'Dados do formulário guardados neste navegador (excepto e-mail).':'Os dados do formulário ficam neste navegador.'}} Nenhum pagamento é necessário. A utilização da IA depende da tua escolha e da disponibilidade do serviço. O motor de regras funciona sem IA.</p>
-          <p v-if="mensagem" :role="estado==='erro'?'alert':'status'" aria-live="polite" :class="estado==='erro'?'field-error':'success-message'">{{ mensagem }}</p>
+
+          <div v-else-if="passo === 2">
+            <div class="form-heading"><span class="eyebrow">PASSO 02 · OBJECTIVO</span><h2 id="formulario-titulo">Definição do objectivo</h2><p>Descreva o resultado pretendido e indique a disponibilidade semanal.</p></div>
+            <div class="field"><label for="objetivo">Objectivo para os próximos 30 dias *</label><textarea id="objetivo" v-model.trim="perfil.objetivo" maxlength="450" rows="3" placeholder="Ex.: Preparar um portefólio para candidaturas de estágio." :aria-invalid="Boolean(erro.objetivo)" /><small v-if="erro.objetivo" class="error-text">{{ erro.objetivo }}</small><small class="field-hint">{{ perfil.objetivo.length }}/450 caracteres</small></div>
+            <div class="field-grid"><div class="field"><label for="disponibilidade">Tempo por semana *</label><select id="disponibilidade" v-model="perfil.disponibilidade"><option v-for="x in DISPONIBILIDADES" :key="x">{{ x }}</option></select></div><div class="field"><label for="internet">Acesso à Internet *</label><select id="internet" v-model="perfil.internet"><option v-for="x in INTERNET" :key="x">{{ x }}</option></select></div></div>
+            <details class="form-disclosure"><summary>Informações adicionais <span>(opcional)</span></summary><div class="form-disclosure-content"><div class="field"><label for="competencias">Competências existentes</label><textarea id="competencias" v-model.trim="perfil.competencias" maxlength="300" rows="2" placeholder="Ex.: JavaScript básico, trabalhar em equipa…" /><small v-if="erro.competencias" class="error-text">{{ erro.competencias }}</small></div><div class="field"><label for="dificuldade">Maior dificuldade</label><textarea id="dificuldade" v-model.trim="perfil.dificuldade" maxlength="450" rows="2" placeholder="Ex.: Pouco tempo livre ou Internet limitada." /><small v-if="erro.dificuldade" class="error-text">{{ erro.dificuldade }}</small></div></div></details>
+            <div class="wizard-actions"><button type="button" class="btn btn-outline" @click="voltar">← Voltar</button><button type="button" class="btn btn-primary" @click="avancar">Continuar ↗</button></div>
+          </div>
+
+          <div v-else>
+            <div class="form-heading"><span class="eyebrow">PASSO 03 · CONFIRMAÇÃO</span><h2 id="formulario-titulo">Revisão e criação do plano</h2><p>Revise as informações antes de gerar o plano. Não é necessário criar uma conta.</p></div>
+            <div class="review-box"><div><small>ÁREA</small><strong>{{ perfil.area }}</strong></div><div><small>OBJECTIVO</small><strong>{{ perfil.objetivo }}</strong></div><div><small>TEMPO</small><strong>{{ perfil.disponibilidade }}</strong></div></div>
+            <button class="btn btn-primary full-button" type="button" @click="criarPrevia">Gerar plano ↗</button>
+            <p class="form-helper">O plano inicial é gerado no navegador, sem recurso a serviços externos de IA.</p>
+            <details class="optional-panel"><summary>Solicitar envio por e-mail <span aria-hidden="true">⌄</span></summary><div class="optional-panel-content"><p>O envio é opcional. Será enviada uma confirmação e, posteriormente, uma ligação privada para descarregar o PDF.</p><div class="hp-field" aria-hidden="true"><label for="website">Não preencher<input id="website" v-model="website" type="text" autocomplete="off" tabindex="-1" /></label></div><div class="field"><label for="email">Endereço de e-mail</label><input id="email" v-model.trim="email" type="email" placeholder="nome@exemplo.com" autocomplete="email" :aria-invalid="Boolean(erro.email)" /><small v-if="erro.email" class="error-text">{{ erro.email }}</small></div><label class="choice-label"><input v-model="perfil.usarIA" type="checkbox" /><span><strong>Personalização com IA Gemini (opcional)</strong><small>Se esta opção for activada, a área, a situação, o objectivo, as competências e as dificuldades poderão ser enviados à Google. O endereço de e-mail não é partilhado com a IA. Se o serviço estiver indisponível, será utilizada a geração de plano sem IA.</small></span></label><label class="choice-label choice-consent"><input v-model="consentimento" type="checkbox" :aria-invalid="Boolean(erro.consentimento)" /><span>Autorizo o tratamento dos meus dados para receber os dois e-mails. Sei que este plano não garante emprego.</span></label><small v-if="erro.consentimento" class="error-text">{{ erro.consentimento }}</small><p class="integration-notice" role="status">{{ descricaoServico }}</p><button type="submit" class="btn btn-outline full-button" :disabled="loading || !enviarDisponivel">{{ loading ? 'A enviar…' : 'Confirmar pedido de envio' }}</button></div></details>
+            <div class="wizard-actions final-actions"><button type="button" class="text-button" @click="voltar">← Rever informações</button><button type="button" class="text-button danger" @click="apagarLocal">Limpar dados locais</button></div>
+          </div>
+          <div v-if="planoRemoto" class="remote-choice" role="status"><strong>A versão recebida por e-mail apresenta actividades diferentes.</strong><p>O plano actual foi preservado. É possível adoptar a versão recebida mediante confirmação.</p><button type="button" class="btn btn-outline" @click="adoptarPlanoRemoto">Adoptar plano recebido</button></div><p v-if="mensagem" class="feedback" :class="{ 'feedback-error': estado === 'erro' }" :role="estado === 'erro' ? 'alert' : 'status'">{{ mensagem }}</p>
+          <div v-if="pedido" class="sent-status" :class="{ 'sent-status-warning': pedido.estado === 'incerto' || pedido.estado === 'falhou' }" role="status"><strong>Estado: {{ estadoLegivel }}</strong><p>Envio previsto: {{ new Date(pedido.agendadoPara).toLocaleString('pt-MZ') }}. O navegador pode ser fechado.</p><button type="button" class="text-button" @click="actualizarEstado">Actualizar estado ↻</button></div>
         </form>
       </section>
-      <aside class="plan-steps-card" aria-label="Percurso do pedido">
-        <div class="card-heading"><div><span class="eyebrow">ETAPA 02</span><h2>O que vais receber</h2></div><span class="privacy-chip">30 dias</span></div>
-        <div class="delivery-timeline"><div><strong>01 · Confirmação</strong><p>Logo após submeteres os dados, recebes um e-mail com as escolhas registadas.</p></div><div><strong>02 · Plano detalhado</strong><p>Aproximadamente 5 a 7 minutos depois, um segundo e-mail com quatro semanas de tarefas, metas e uma ligação privada para descarregar o PDF.</p></div><div><strong>03 · Continuidade</strong><p>Consulta o teu PDF e acompanha o progresso ao longo do mês. O plano não garante oportunidades de emprego.</p></div></div>
-        <div v-if="trabalho" class="job-status" role="status"><strong>Estado do pedido: {{estadoLegivel}}</strong><p>Envio previsto: {{new Date(trabalho.agendadoPara).toLocaleString('pt-PT')}} (hora local do navegador). O servidor continua a processar mesmo que saias desta página.</p><button type="button" class="link-button" @click="consultarEstado">Actualizar estado</button></div>
-        <div v-if="gerado" class="plan-preview"><span class="eyebrow">O PLANO PREPARADO</span><h3>{{gerado.titulo}}</h3><p>{{gerado.diagnostico}}</p><span class="privacy-chip">{{ gerado.metodo }}</span><p class="plan-time-note">Cada tarefa indica uma duração sugerida. Ajusta o ritmo às tuas condições reais.</p><div class="mini-week" v-for="s in gerado.semanas" :key="s.numero"><h4>Semana {{s.numero}} — {{tituloSemana(s)}}</h4><p>{{s.foco}}</p><p v-if="tempoSemana(s)>0" class="week-duration">{{tempoSemana(s)}} min de actividades sugeridas</p><ul><li v-for="(t,i) in s.tarefas" :key="i">{{t}}</li></ul><small>Entregável: {{s.entregavel}}</small></div><button type="button" class="btn btn-primary pdf-button" @click="descarregar">Descarregar PDF do plano ↓</button></div>
-        <div v-else class="plan-preview-empty"><span class="eyebrow">ANTES DE COMEÇARES</span><h3>Um plano útil adapta-se à vida real.</h3><p>Não sugerimos cursos pagos, candidaturas inventadas nem metas impossíveis para quem tem pouco tempo ou acesso limitado à Internet.</p><p><strong>Fonte de contexto:</strong> indicadores de desemprego juvenil para Moçambique publicados pelo Banco Mundial; não são previsões individuais.</p></div>
+
+      <aside class="wizard-side">
+        <div class="side-top"><span class="eyebrow">ESTRUTURA DO PLANO</span><h2>Actividades <em>organizadas por etapas.</em></h2></div>
+        <div class="side-benefits"><div><span aria-hidden="true">01</span><p><strong>4 semanas</strong><small>Objectivos e actividades por semana.</small></p></div><div><span aria-hidden="true">02</span><p><strong>Actividades planeadas</strong><small>Distribuição de tempo por actividade.</small></p></div><div><span aria-hidden="true">03</span><p><strong>Documento e progresso</strong><small>Descarregue o PDF e registe as tarefas concluídas.</small></p></div></div>
+        <p class="side-privacy">As informações são guardadas neste navegador. O e-mail só é utilizado mediante pedido de envio.</p>
       </aside>
     </div>
-    <div class="section-head below-plan"><div><span class="eyebrow section-kicker">APRENDER SEM PAGAR</span><h2>Ideias práticas para começar</h2></div></div>
-    <div class="resources-grid"><article class="resource-card"><span class="pill">Gratuito</span><h3>{{areaRecurso.categoria}}</h3><p>{{areaRecurso.descricao}}</p><router-link class="text-link" to="/indicadores">Contexto do mercado de trabalho ↗</router-link></article><article class="resource-card"><span class="pill">Acessível</span><h3>Estuda com pouco tráfego</h3><p>Descarrega materiais leves, reutiliza notas offline e faz sessões curtas. As sugestões foram concebidas para não exigir gastos.</p></article><article class="resource-card"><span class="pill">Prático</span><h3>Um resultado por semana</h3><p>Transforma cada bloco do plano numa evidência que consigas mostrar: documento, pequeno projecto ou resumo de aprendizagem.</p></article></div>
+
+    <section v-if="plano" class="plan-result" aria-labelledby="resultado-titulo">
+      <p v-if="desactualizado" class="feedback feedback-error" role="status">As informações foram alteradas após a criação do plano. Gere uma nova versão para actualizar as actividades. O progresso anterior permanece guardado até à substituição.</p>
+      <div class="plan-result-head"><div><span class="eyebrow">PLANO DISPONÍVEL</span><h2 id="resultado-titulo">{{ plano.titulo }}</h2><p>{{ plano.diagnostico }}</p></div><div class="plan-result-actions"><RouterLink class="btn btn-primary" to="/progresso">Acompanhar actividades ↗</RouterLink><button type="button" class="btn btn-outline" @click="descarregar">Descarregar PDF ↓</button></div></div>
+      <div class="week-overview"><div v-for="s in plano.semanas" :key="s.numero" class="week-overview-item"><span>SEMANA {{ String(s.numero).padStart(2, '0') }}</span><strong>{{ s.titulo }}</strong><small>{{ s.minutosSugeridos }} minutos de actividades</small></div></div>
+    </section>
   </div>
 </template>

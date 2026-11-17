@@ -1,18 +1,18 @@
 {
   "name": "rumocerto-mz",
   "private": true,
-  "version": "2.4.0",
+  "version": "3.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test tests/*.test.js backend/tests/*.test.js",
-    "worker:dev": "cd backend && wrangler dev --local --port 8787",
-    "worker:deploy": "cd backend && wrangler deploy"
+    "preview": "vite preview",
+    "test": "node --test tests/*.test.js",
+    "check:syntax": "node --check shared/versao.js && node --check shared/persistencia.js && node --check shared/planner.js && node --check shared/estado.js && node --check shared/pdf.js && node --check shared/fonteUnicode.js && node --check backend/worker.js && node --check shared/perfis.js",
+    "worker:dev": "wrangler dev --config backend/wrangler.toml",
+    "worker:deploy": "wrangler deploy --config backend/wrangler.toml"
   },
   "dependencies": {
-    "@emailjs/browser": "^4.4.1",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
   },
