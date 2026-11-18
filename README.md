@@ -1,3 +1,4 @@
+
 # RumoCerto MZ — versão 3.6
 
 **Projecto Final de Programação Web II · Grupo 8 · LECC31 · ISUTC · 2026**
@@ -15,11 +16,23 @@ A interface da versão 3.6 organiza a criação do plano em três passos, manté
 
 ## Equipa
 
-| Membro | Número de estudante | Conta GitHub |
-|---|---|---|
-| Benjamim Junior | A confirmar | A confirmar |
-| Elmer Almirante | 7473 | A confirmar |
-| Mabikane Arnaldo | A confirmar | A confirmar |
+**Grupo 8 — Programação Web II | LECC31 | ISUTC | 2026**
+
+O RumoCerto MZ foi desenvolvido pelos seguintes membros do Grupo 8 do Instituto Superior de Transportes e Comunicações (ISUTC).
+
+| Nº | Nome completo | Conta GitHub |
+|:---:|---|---|
+| 1 | **Benjamim Junior** | [@benjamimjunior](https://github.com/benjamimjunior) |
+| 2 | **Elmer Almirante** | [@ElmerAlmirante](https://github.com/ElmerAlmirante) |
+| 3 | **Mabikane Arnaldo** | [@K6N9](https://github.com/K6N9) |
+
+### Colaboração no projecto
+
+O desenvolvimento do RumoCerto MZ é realizado de forma colaborativa através do GitHub. Cada membro utiliza a sua conta pessoal para contribuir para o código, a documentação, os testes e as melhorias da plataforma.
+
+As contribuições são organizadas através de branches individuais, commits e Pull Requests, permitindo manter o histórico das alterações e identificar a participação de cada membro.
+
+**Repositório oficial:** [K6N9/rumocerto-mz](https://github.com/K6N9/rumocerto-mz)
 
 ## Tecnologias
 
