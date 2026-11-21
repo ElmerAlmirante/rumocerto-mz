@@ -72,3 +72,12 @@
 .week-overview-item > span { color: #087d70; font-size: 12px; font-weight: 800; letter-spacing: .07em; }
 .week-overview-item strong { font-size: 13px; overflow-wrap: anywhere; }
 .week-overview-item small { font-size: 13px; color: #56737f; }
+
+.remote-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.4rem; margin-top: 0.8rem; }
+.remote-actions button:disabled { opacity: 0.6; cursor: wait; }
+/* Verificação e recuperação */
+.captcha-box { display: grid; gap: 8px; margin: 12px 0 20px; min-height: 88px; }
+.captcha-box small { font-size: 12px; color: #647e89; }
+.sent-status .field { max-width: 270px; margin: 15px 0 12px; }
+.optional-panel-content button { max-width: 100%; }
+@media (max-width: 460px) { .captcha-box { overflow-x: auto; } }

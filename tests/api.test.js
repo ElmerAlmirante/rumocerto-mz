@@ -35,7 +35,7 @@ function ambiente() {
     PUBLIC_WORKER_URL: 'https://rumocerto.example.com',
     EMAILJS_SERVICE_ID: 'service_demo', EMAILJS_PUBLIC_KEY: 'public_demo',
     EMAILJS_TEMPLATE_CONFIRM: 'confirm_demo', EMAILJS_TEMPLATE_PLAN: 'plan_demo',
-    RATE_SALT: 'salt-seguro-para-testes-2026', DOWNLOAD_SECRET: 'uma-frase-secreta-de-pelo-menos-24-caracteres'
+    REQUIRE_EMAIL_VERIFICATION: 'false', RATE_SALT: 'salt-seguro-para-testes-2026', DOWNLOAD_SECRET: 'uma-frase-secreta-de-pelo-menos-24-caracteres'
   }
   env.PLANOS = {
     idFromName: nome => nome,
@@ -73,7 +73,7 @@ test('saude declara protocolo e disponibilidade do envio', async () => {
   const response = await worker.fetch(request('/api/saude'), env)
   const body = await response.json()
   assert.equal(response.status, 200)
-  assert.equal(body.versao, '3.5')
+  assert.equal(body.versao, '3.8')
   assert.equal(body.envioDisponivel, true)
 })
 test('bloqueia origem desconhecida e responde a preflight', async () => {
@@ -342,4 +342,105 @@ test('a reserva não pode ser libertada por outro identificador', async () => {
   assert.equal((await gate.fetch('https://interno/reservar',opcoes(crypto.randomUUID()))).status,429)
   assert.deepEqual(await (await gate.fetch('https://interno/libertar',opcoes(id))).json(),{libertado:true})
   assert.equal((await gate.fetch('https://interno/reservar',opcoes(crypto.randomUUID()))).status,200)
+})
+
+test('recusa pedidos sem JSON e corpos maiores que 8 KB sem criar registos', async () => {
+  const { env, planos } = ambiente()
+  const id = crypto.randomUUID()
+  const semTipo = new Request('https://rumocerto.example.com/api/planos', {
+    method: 'POST', headers: { Origin: 'https://k6n9.github.io', 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ ...dados(), submissaoId: id })
+  })
+  assert.equal((await worker.fetch(semTipo, env)).status, 415)
+  const grande = new Request('https://rumocerto.example.com/api/planos', {
+    method: 'POST', headers: { Origin: 'https://k6n9.github.io', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...dados(), submissaoId: id, lixo: 'x'.repeat(12000) })
+  })
+  assert.equal((await worker.fetch(grande, env)).status, 413)
+  assert.equal(planos.size, 0)
+  const corrompido = new Request('https://rumocerto.example.com/api/planos', {
+    method: 'POST', headers: { Origin: 'https://k6n9.github.io', 'Content-Type': 'application/json' },
+    body: '{'
+  })
+  assert.equal((await worker.fetch(corrompido, env)).status, 400)
+})
+
+test('ligação de PDF tem validade, assinatura e não permite adulterar o prazo', async () => {
+  const antigo = globalThis.fetch
+  globalThis.fetch = async () => new Response('OK', { status: 200 })
+  try {
+    const { env } = ambiente()
+    const criado = await (await worker.fetch(request('/api/planos', 'POST', dados()), env)).json()
+    const url = new URL(await teste.ligacaoPdf(env, criado.id))
+    const prazo = Number(url.searchParams.get('expira'))
+    assert.ok(prazo - Date.now() > 47 * 60 * 60 * 1000)
+    assert.ok(prazo - Date.now() <= 48 * 60 * 60 * 1000)
+    const valido = await worker.fetch(request(url.pathname + url.search), env)
+    assert.equal(valido.status, 200)
+    const alterado = new URL(url)
+    alterado.searchParams.set('expira', String(prazo + 10000))
+    assert.equal((await worker.fetch(request(alterado.pathname + alterado.search), env)).status, 401)
+    const expirado = new URL(url)
+    expirado.searchParams.set('expira', String(Date.now() - 1000))
+    assert.equal((await worker.fetch(request(expirado.pathname + expirado.search), env)).status, 410)
+    const semPrazo = new URL(url)
+    semPrazo.searchParams.delete('expira')
+    assert.equal((await worker.fetch(request(semPrazo.pathname + semPrazo.search), env)).status, 401)
+  } finally { globalThis.fetch = antigo }
+})
+
+test('eliminar pedido exige token, apaga dados, cancela alarme e revoga PDF', async () => {
+  const antigo = globalThis.fetch
+  const mensagens = []
+  globalThis.fetch = async (_url, init) => { mensagens.push(JSON.parse(init.body)); return new Response('OK', { status: 200 }) }
+  try {
+    const { env, planos } = ambiente()
+    const criado = await (await worker.fetch(request('/api/planos', 'POST', dados()), env)).json()
+    const link = new URL(await teste.ligacaoPdf(env, criado.id))
+    const caminho = `/api/planos/${criado.id}`
+    assert.equal((await worker.fetch(request(caminho, 'DELETE'), env)).status, 401)
+    assert.equal((await worker.fetch(request(caminho, 'DELETE', null, 'https://k6n9.github.io', 'a'.repeat(48)), env)).status, 401)
+    const response = await worker.fetch(request(caminho, 'DELETE', null, 'https://k6n9.github.io', criado.token), env)
+    assert.equal(response.status, 200)
+    assert.equal((await response.json()).eliminado, true)
+    const objecto = planos.get(criado.id)
+    assert.equal(await objecto.state.storage.get('job'), undefined)
+    await objecto.object.alarm()
+    assert.equal(mensagens.length, 1)
+    assert.equal((await worker.fetch(request(link.pathname + link.search), env)).status, 404)
+    assert.equal((await worker.fetch(request(caminho, 'GET', null, 'https://k6n9.github.io', criado.token), env)).status, 404)
+    assert.equal((await worker.fetch(request(caminho, 'DELETE', null, 'https://k6n9.github.io', criado.token), env)).status, 404)
+  } finally { globalThis.fetch = antigo }
+})
+
+test('resposta de limite informa segundos para aguardar e Retry-After', async () => {
+  const antigo = globalThis.fetch
+  globalThis.fetch = async () => new Response('OK', { status: 200 })
+  try {
+    const { env } = ambiente()
+    assert.equal((await worker.fetch(request('/api/planos', 'POST', dados()), env)).status, 201)
+    const r = await worker.fetch(request('/api/planos', 'POST', {
+      ...dados(), submissaoId: crypto.randomUUID(), email: 'outra@example.com'
+    }), env)
+    assert.equal(r.status, 429)
+    const body = await r.json()
+    assert.ok(body.aguardarSegundos >= 1 && body.aguardarSegundos <= 90)
+    assert.equal(r.headers.get('Retry-After'), String(body.aguardarSegundos))
+    assert.equal(r.headers.get('X-Content-Type-Options'), 'nosniff')
+  } finally { globalThis.fetch = antigo }
+})
+
+test('preflight autoriza DELETE e não permite origem desconhecida para eliminação', async () => {
+  const { env } = ambiente()
+  const r = await worker.fetch(request('/api/planos', 'OPTIONS'), env)
+  assert.match(r.headers.get('Access-Control-Allow-Methods'), /DELETE/)
+  assert.equal((await worker.fetch(request(`/api/planos/${crypto.randomUUID()}`, 'DELETE', null,
+    'https://site-externo.example', 'a'.repeat(48)), env)).status, 403)
+})
+
+test('recusa identificadores que não sejam UUID versão 4', async () => {
+  const { env } = ambiente()
+  const invalido = '11111111-1111-1111-1111-111111111111'
+  assert.equal((await worker.fetch(request(`/api/planos/${invalido}`, 'GET'), env)).status, 404)
+  assert.equal((await worker.fetch(request(`/api/planos/${invalido}`, 'DELETE'), env)).status, 404)
 })

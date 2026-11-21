@@ -16,7 +16,9 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --no-audit --no-fund
+      - run: npm run check:syntax
       - run: npm test
+      - run: npm run test:integracao
       - run: npm run build
   publicar:
     if: github.event_name != 'pull_request'
@@ -35,9 +37,18 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --no-audit --no-fund
-      - run: npm run build
+      - name: Validar Worker e configurações de publicação
+        run: npm run producao:teste
+        env:
+          RUMOCERTO_WORKER_URL: ${{ vars.VITE_WORKER_URL }}
+          RUMOCERTO_ALLOWED_ORIGIN: https://k6n9.github.io
+          RUMOCERTO_PUBLICACAO_ESTRITA: 'true'
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
+      - name: Compilar o site com URL do Worker e Turnstile
+        run: npm run build
         env:
           VITE_WORKER_URL: ${{ vars.VITE_WORKER_URL }}
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,1 +1,1 @@
-export const VERSAO_PROTOCOLO = '3.5'
+export const VERSAO_PROTOCOLO = '3.8'

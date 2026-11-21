@@ -69,7 +69,7 @@ test('formata taxa com percentagem', () => assert.match(formatarTaxa(11.6), /%/)
 test('preserva valor monetário e sinal de tarefa como texto legível no PDF', () => {
   const p = { ...perfil(), objetivo: 'Preparar CV com 50€ de orçamento e tarefas ✓ para candidatura' }
   const pdf = new TextDecoder('latin1').decode(gerarPdf(p, gerarPlano(p)))
-  assert.match(pdf, /50[\x80\u20AC]/)
+  assert.match(pdf, /50€/)
   assert.match(pdf, /\[concluído\]/)
 })
 test('recupera plano especializado de redes informáticas', () => {
@@ -102,4 +102,17 @@ test('caracteres sem glifo aparecem identificados sem perder o ponto Unicode', a
   const { textoFonte } = await import('../shared/fonteUnicode.js')
   const mock = { glifo: cp => cp >= 32 && cp < 127 ? 1 : 0 }
   assert.equal(textoFonte('CV 📌', mock), 'CV [U+1F4CC]')
+})
+
+test('validação rejeita estruturas no lugar de texto em vez de as converter em palavras', () => {
+  for (const [campo, valor] of [
+    ['objetivo', { descricao: 'Objectivo malformado' }],
+    ['nome', ['Ana']],
+    ['competencias', { html: '<b>unsafe</b>' }],
+    ['dificuldade', ['Pouco tempo']],
+  ]) {
+    assert.ok(validarPerfil({ ...perfil(), [campo]: valor })[campo], campo)
+  }
+  assert.ok(validarPerfil({ ...perfil(), email: { endereco: 'a@example.com' }, consentimento: true },
+    { exigirEmail: true }).email)
 })

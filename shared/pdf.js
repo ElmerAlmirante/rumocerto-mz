@@ -1,4 +1,4 @@
-import { carregarFonteTTF, larguraFonte, textoCodificado, objectosFonte, obterFonteUnicode, textoFonte } from './fonteUnicode.js'
+import { carregarFonteTTF, larguraFonte, textoCodificado, objectosFonte, textoFonte } from './fonteUnicode.js'
 function winAnsi(value) {
   return String(value ?? '').normalize('NFC')
     .replace(/[\u2018\u2019]/g, "'")
@@ -252,6 +252,6 @@ export function gerarPdf(pedido, plano, opcoes = {}) {
 }
 
 export async function gerarPdfUnicode(pedido, plano, opcoes = {}) {
-  const dadosFonte = opcoes.fonteBytes || await obterFonteUnicode()
-  return gerarPdf(pedido, plano, { fonteBytes: dadosFonte })
+  if (!opcoes.fonteBytes) return gerarPdf(pedido, plano)
+  return gerarPdf(pedido, plano, { fonteBytes: opcoes.fonteBytes })
 }

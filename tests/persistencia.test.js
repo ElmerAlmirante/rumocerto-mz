@@ -41,7 +41,7 @@ test('recupera apenas tarefas que existem e nao confia em assinaturas guardadas'
 test('PDF nao apaga caracteres sem suporte e conserva o seu ponto Unicode', () => {
   const p = { ...perfil(), objetivo: 'Preparar currículo com 50€, símbolos 📌 e caracteres 你好' }
   const doc = new TextDecoder('latin1').decode(gerarPdf(p, gerarPlano(p)))
-  assert.match(doc, /50[\x80\u20AC]/)
+  assert.match(doc, /50€/)
   assert.match(doc, /\[U\+1F4CC\]/)
   assert.match(doc, /\[U\+4F60\]/)
   assert.match(doc, /\[U\+597D\]/)

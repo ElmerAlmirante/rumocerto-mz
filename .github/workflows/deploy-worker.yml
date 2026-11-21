@@ -1,0 +1,27 @@
+name: Publicação manual do Worker
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  publicar-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check:syntax && npm test && npm run test:integracao
+      - name: Confirmar configuração de acesso ao Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Falta o secret CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Falta o secret CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+      - name: Publicar apenas após configuração dos segredos no Cloudflare
+        run: npm run worker:deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

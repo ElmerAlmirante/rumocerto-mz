@@ -1,6 +1,3 @@
-const ENDERECO_FONTE = 'https://raw.githubusercontent.com/prawnpdf/prawn/master/data/fonts/DejaVuSans.ttf'
-let fonteEmMemoria = null
-
 function u16(v, p) { return v.getUint16(p, false) }
 function i16(v, p) { return v.getInt16(p, false) }
 function u32(v, p) { return v.getUint32(p, false) }
@@ -157,18 +154,5 @@ export function objectosFonte(fonte, adicionar) {
 }
 
 export async function obterFonteUnicode() {
-  if (!fonteEmMemoria) {
-    fonteEmMemoria = (async () => {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 7000)
-      try {
-        const resposta = await fetch(ENDERECO_FONTE, { signal: controller.signal })
-        if (!resposta.ok) throw new Error('Fonte Unicode indisponível')
-        const bytes = new Uint8Array(await resposta.arrayBuffer())
-        if (bytes.length > 3500000) throw new Error('Ficheiro de fonte demasiado grande')
-        return bytes
-      } finally { clearTimeout(timeout) }
-    })().catch(e => { fonteEmMemoria = null; throw e })
-  }
-  return fonteEmMemoria
+  throw new Error('A fonte Unicode deve ser fornecida explicitamente; não descarregamos fontes externas.')
 }

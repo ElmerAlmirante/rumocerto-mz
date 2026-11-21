@@ -11,13 +11,13 @@ export function validarPerfil(p, { exigirEmail = false } = {}) {
   if (!SITUACOES.includes(p.situacao)) e.situacao = 'Seleccione a situação actual.'
   if (!DISPONIBILIDADES.includes(p.disponibilidade)) e.disponibilidade = 'Seleccione a disponibilidade semanal.'
   if (!INTERNET.includes(p.internet)) e.internet = 'Seleccione a condição de acesso à Internet.'
-  const objetivo = limparTexto(p.objetivo)
-  if (objetivo.length < 12 || String(p.objetivo || '').length > 450) e.objetivo = 'Descreva um objectivo entre 12 e 450 caracteres.'
-  if (String(p.competencias || '').length > 300) e.competencias = 'Limite de 300 caracteres.'
-  if (String(p.dificuldade || '').length > 450) e.dificuldade = 'Limite de 450 caracteres.'
-  if (String(p.nome || '').length > 90) e.nome = 'Limite de 90 caracteres.'
+  const objetivo = typeof p.objetivo === 'string' ? limparTexto(p.objetivo) : ''
+  if (objetivo.length < 12 || typeof p.objetivo !== 'string' || p.objetivo.length > 450) e.objetivo = 'Descreva um objectivo entre 12 e 450 caracteres.'
+  if (p.competencias != null && (typeof p.competencias !== 'string' || p.competencias.length > 300)) e.competencias = 'Limite de 300 caracteres.'
+  if (p.dificuldade != null && (typeof p.dificuldade !== 'string' || p.dificuldade.length > 450)) e.dificuldade = 'Limite de 450 caracteres.'
+  if (p.nome != null && (typeof p.nome !== 'string' || p.nome.length > 90)) e.nome = 'Limite de 90 caracteres.'
   if (exigirEmail) {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(p.email || '')) || String(p.email || '').length > 150) e.email = 'Introduza um endereço de e-mail válido.'
+    if (typeof p.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email) || p.email.length > 150) e.email = 'Introduza um endereço de e-mail válido.'
     if (p.consentimento !== true) e.consentimento = 'É necessário autorizar o tratamento dos dados para envio por e-mail.'
     if (p.website) e.geral = 'Pedido inválido.'
   }
@@ -77,6 +77,11 @@ export function gerarPlano(p, options = {}) {
       semana.tarefas = [...especialista.tarefas[i], rotinas[2]]
       semana.entregavel = especialista.entregaveis[i]
     }
+    semanas[0].tarefas[0] = `Definir três resultados concretos para a meta «${limparTexto(objetivo,130)}» na área de ${especialista.nome}.`
+    if (competencias) semanas[1].tarefas[3] = `Praticar uma competência nova a partir da experiência existente: ${limparTexto(competencias,130)}.`
+    if (dificuldades) semanas[2].tarefas[3] = `Experimentar uma solução prática para a dificuldade: ${limparTexto(dificuldades,130)}.`
+    semanas[3].tarefas[4] = modoOffline ? 'Guardar os resultados num ficheiro leve e organizar a próxima etapa sem depender de Internet.' :
+      'Reunir os resultados e pedir comentários a uma pessoa da área, quando possível.'
   }
   return {
     versao:4, titulo:`Plano de 30 dias — ${especialista?.nome || p.area}`, metodo:'Plano de desenvolvimento profissional', criadoEm:options.criadoEm || new Date().toISOString(),
