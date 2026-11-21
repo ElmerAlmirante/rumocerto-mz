@@ -5,7 +5,7 @@ import { VERSAO_PROTOCOLO } from '../shared/versao.js'
 import { FalhaEmail, enviarEmail, fornecedor, envioConfigurado, recuperarConfigurado, verificarWebhookResend } from './email.js'
 
 const RETENCAO_MS = 7 * 24 * 60 * 60 * 1000
-const ESPERA_MS = 5 * 60 * 1000
+const ESPERA_MS = 30 * 1000
 const LIMITE_MS = 90 * 1000
 const DIA_MS = 24 * 60 * 60 * 1000
 const CODIGO_LIMITE_MS = DIA_MS

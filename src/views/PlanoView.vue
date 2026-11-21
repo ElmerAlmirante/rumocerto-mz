@@ -111,7 +111,7 @@ function mensagemEstadoEnvio(res){
   if(res.estado==='enviado')return 'A mensagem foi aceite pelo serviço de e-mail. Confirme a recepção na caixa de entrada ou na pasta de spam.'
   if(res.estado==='por_confirmar' || res.estado==='a_confirmar')return 'Pedido registado. A confirmação está em processamento. Não é necessário enviar novamente.'
   return res.recuperado ? 'O pedido já se encontrava registado. Não foram geradas mensagens adicionais.' :
-    'A confirmação foi aceite pelo serviço de e-mail. A mensagem final está prevista para cerca de 5 a 7 minutos.'
+    'A confirmação foi aceite pelo serviço de e-mail. A mensagem final está prevista para cerca de 30 segundos após a confirmação do e-mail.'
 }
 async function pedirPorEmail(){
   if(loading.value||cancelando.value)return
@@ -182,7 +182,7 @@ async function confirmarCodigoEmail(){
     const res=await r.json()
     if(!r.ok)throw new Error(res.erro||'Não foi possível confirmar o endereço.')
     pedido.value={...pedido.value,...res};codigoEmail.value='';guardarPedidoPendente()
-    mensagem.value='Endereço confirmado. O plano será enviado cerca de cinco minutos após esta confirmação.'
+    mensagem.value='Endereço confirmado. O plano será enviado cerca de 30 segundos após esta confirmação.'
     if(timer)clearInterval(timer);timer=setInterval(actualizarEstado,30000)
   }catch(e){mensagem.value=e.message}finally{verificando.value=false}
 }
