@@ -41,7 +41,7 @@ jobs:
         run: npm run producao:teste
         env:
           RUMOCERTO_WORKER_URL: ${{ vars.VITE_WORKER_URL }}
-          RUMOCERTO_ALLOWED_ORIGIN: https://k6n9.github.io
+          RUMOCERTO_ALLOWED_ORIGIN: https://elmeralmirante.github.io
           RUMOCERTO_PUBLICACAO_ESTRITA: 'true'
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
       - name: Compilar o site com URL do Worker e Turnstile
